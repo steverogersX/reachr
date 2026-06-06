@@ -21,6 +21,10 @@ const ConfigSchema = z.object({
         maxAttempts: z.coerce.number().int().min(1).default(3),
         backoffMs: z.coerce.number().int().min(0).default(800),
     }),
+
+    cache: z.object({
+        ttlHours: z.coerce.number().int().min(0).default(24),
+    }),
 });
 
 function load() {
@@ -38,6 +42,9 @@ function load() {
             limit: process.env.PROSPEO_LIMIT,
             maxAttempts: process.env.PROSPEO_MAX_ATTEMPTS,
             backoffMs: process.env.PROSPEO_BACKOFF_MS,
+        },
+        cache: {
+            ttlHours: process.env.CACHE_TTL_HOURS,
         },
     });
 
