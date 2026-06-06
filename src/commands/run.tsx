@@ -1,8 +1,8 @@
 import { render } from 'ink';
 import { z } from 'zod';
 import { parse as parseDomain } from 'tldts';
-import { RunPipeline } from '@/ui/RunPipeline.tsx';
-import { fatal } from '@/utils/fatal.ts';
+import { RunPipeline } from '@/ui/RunPipeline';
+import { fatal } from '@/utils/fatal';
 
 const DomainSchema = z
   .string()
