@@ -6,6 +6,7 @@ import { useSpinner } from '@/ui/hooks/useSpinner';
 export interface StageItem {
   primary: string;
   secondary?: string;
+  icon?: string;
 }
 
 interface Props {
@@ -60,7 +61,7 @@ export function StageBox({ index, title, status, items, timing, error }: Props) 
       {/* Streamed items */}
       {items.map((item, i) => (
         <Box key={i} marginLeft={3} gap={2}>
-          <Text color="cyanBright">✦</Text>
+          <Text color="cyanBright">{item.icon ?? '✦'}</Text>
           <Text color="white">{item.primary}</Text>
           {item.secondary && (
             <Text color="gray" dimColor>{item.secondary}</Text>
