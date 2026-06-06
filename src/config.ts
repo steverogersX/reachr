@@ -1,9 +1,10 @@
 import 'dotenv/config';
 import { z } from 'zod';
-import { fatal } from '@/utils/fatal.ts';
+import { fatal } from '@/utils/fatal';
 
 const EnvSchema = z.object({
-  APOLLO_API_KEY: z.string().min(1),
+  APOLLO_API_KEY:      z.string().min(1),
+  COMPANYRICH_API_KEY: z.string().min(1),
 });
 
 const result = EnvSchema.safeParse(process.env);
