@@ -1,5 +1,6 @@
+import '@/config.ts';
 import { Command } from 'commander';
-import { runCommand } from './commands/run.js';
+import { runCommand } from '@/commands/run.ts';
 
 const program = new Command();
 
