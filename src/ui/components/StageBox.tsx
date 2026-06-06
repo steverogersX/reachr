@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { StageStatus } from '../../services/types.js';
-import { useSpinner } from '../hooks/useSpinner.js';
+import type { StageStatus } from '@/services/types';
+import { useSpinner } from '@/ui/hooks/useSpinner';
 
 export interface StageItem {
   primary: string;

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useApp } from 'ink';
-import { Header } from './components/Header.js';
-import { StageBox } from './components/StageBox.js';
-import type { StageItem } from './components/StageBox.js';
-import type { StageStatus, Field, LinkedInProfile, Contact } from '../services/types.js';
-import { services } from '../services/index.js';
+import { Header } from '@/ui/components/Header';
+import { StageBox } from '@/ui/components/StageBox';
+import type { StageItem } from '@/ui/components/StageBox';
+import type { StageStatus, Field, LinkedInProfile, Contact } from '@/services/types';
+import { services } from '@/services/index';
 
 interface Props {
   domain: string;

@@ -1,23 +1,29 @@
 import { render } from 'ink';
 import { z } from 'zod';
-import { RunPipeline } from '../ui/RunPipeline.js';
+import { parse as parseDomain } from 'tldts';
+import { RunPipeline } from '@/ui/RunPipeline';
+import { fatal } from '@/utils/fatal';
 
 const DomainSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .regex(
-    /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}(\.[a-zA-Z]{2,})?$/,
-    'Must be a valid domain (e.g. acme.com or sub.acme.co.uk)',
+  .refine(
+    (d) => {
+      const { domain, isIcann, isPrivate } = parseDomain(d, { allowPrivateDomains: true });
+      return !!domain && (isIcann === true || isPrivate === true);
+    },
+    'Must be a valid domain (e.g. acme.com, shop.io, api.acme.co.uk)',
   );
 
 export function runCommand(domain: string): void {
   const result = DomainSchema.safeParse(domain);
 
   if (!result.success) {
-    const message = result.error.issues[0]?.message ?? 'Invalid domain';
-    process.stderr.write(`\n  ✗  ${message}\n  Got: "${domain}"\n\n`);
-    process.exit(1);
+    fatal(result.error.issues[0]?.message ?? 'Invalid domain', {
+      got:  domain,
+      hint: 'Example: acme.com  or  api.acme.co.uk',
+    });
   }
 
   const { waitUntilExit } = render(<RunPipeline domain={result.data} />);

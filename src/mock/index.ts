@@ -1,4 +1,4 @@
-import type { ReachServices, Field, LinkedInProfile, Contact } from '../services/types.js';
+import type { ReachServices, Field, LinkedInProfile, Contact } from '@/services/types';
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const jitter = (base: number, spread: number) => base + Math.random() * spread;
