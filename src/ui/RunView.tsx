@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useApp } from 'ink';
 import { Thread } from '@/ui/thread';
 import { icons } from '@/ui/icons';
-import { runWorkflow } from '@/services/runWorkflow';
-import { TaskStore, type Task, type TaskStatus } from '@/pipeline';
+import { runWorkflow, type WorkflowOptions } from '@/services/runWorkflow';
+import { TaskStore, PipelineState, type Task, type TaskStatus } from '@/pipeline';
 import type { Domain } from '@/services/domains/types';
 import type { Status } from '@/ui/thread/types';
+import { ResultsTable } from '@/ui/ResultsTable';
 
 // --- status mapping ---
 
@@ -109,19 +110,25 @@ function Stage({ task }: { task: Task }) {
 interface RunViewProps {
     domain: Domain;
     store:  TaskStore;
+    state:  PipelineState;
+    opts:   Partial<WorkflowOptions>;
 }
 
-export function RunView({ domain, store }: RunViewProps) {
+export function RunView({ domain, store, state, opts }: RunViewProps) {
     const { exit } = useApp();
     const [tasks, setTasks]           = useState<Task[]>([]);
     const [fatalError, setFatalError] = useState<Error | null>(null);
+    const [complete, setComplete]     = useState(false);
 
     useEffect(() => {
         const onChange = (t: Task[]) => setTasks([...t]);
         store.on('change', onChange);
 
-        runWorkflow(domain, store)
-            .then(() => setTimeout(() => exit(), 300))
+        runWorkflow(domain, store, state, opts)
+            .then(() => {
+                setComplete(true);
+                setTimeout(() => exit(), 500);
+            })
             .catch(err => {
                 const error = err instanceof Error ? err : new Error(String(err));
                 setFatalError(error);
@@ -138,6 +145,7 @@ export function RunView({ domain, store }: RunViewProps) {
                 ? <FatalError error={fatalError} />
                 : tasks.map(task => <Stage key={task.id} task={task} />)
             }
+            {complete && <ResultsTable profiles={state.profiles} />}
         </Box>
     );
 }
