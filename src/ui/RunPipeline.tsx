@@ -5,12 +5,14 @@ import { StageBox }     from '@/ui/components/StageBox';
 import { DomainStage, EmailStage } from '@/ui/components/ParallelStage';
 import type { StageItem } from '@/ui/components/StageBox';
 import type { StageStatus, Contact } from '@/services/types';
-import type { DomainTask, EmailTask } from '@/pipeline/types';
+import type { DomainTask, EmailTask, PipelineOptions } from '@/pipeline/types';
+import { DEFAULT_PIPELINE_OPTIONS } from '@/pipeline/types';
 import { PipelineBus }  from '@/pipeline/bus';
 import { runPipeline }  from '@/pipeline/runner';
 
 interface Props {
-  domain: string;
+  domain:  string;
+  options?: PipelineOptions;
 }
 
 interface UIState {
@@ -35,7 +37,7 @@ const INITIAL: UIState = {
   allContacts:  [],
 };
 
-export function RunPipeline({ domain }: Props) {
+export function RunPipeline({ domain, options = DEFAULT_PIPELINE_OPTIONS }: Props) {
   const { exit }          = useApp();
   const startedAt         = useRef(Date.now());
   const [state, setState] = useState<UIState>(INITIAL);
@@ -107,13 +109,16 @@ export function RunPipeline({ domain }: Props) {
 
     // ── Stage 3: per-profile email tasks ─────────────────────────────────────
     bus.on('emails:task:start', (taskId, profile) =>
-      setState(s => ({
-        ...s,
-        emailTasks: [
-          ...s.emailTasks,
-          { id: taskId, name: profile.name, title: profile.title, status: 'running', startedAt: Date.now() },
-        ],
-      })),
+      setState(s => {
+        if (s.emailTasks.some(t => t.id === taskId)) return s;
+        return {
+          ...s,
+          emailTasks: [
+            ...s.emailTasks,
+            { id: taskId, name: profile.name, title: profile.title, status: 'running', startedAt: Date.now() },
+          ],
+        };
+      }),
     );
     bus.on('contact:found', (taskId, contact) =>
       setState(s => ({
@@ -158,7 +163,7 @@ export function RunPipeline({ domain }: Props) {
     );
     bus.on('pipeline:error', () => setTimeout(exit, 1500));
 
-    runPipeline(domain, bus).catch((err: unknown) => {
+    runPipeline(domain, bus, options).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : 'Unexpected error';
       setState(s => ({ ...s, stage1Status: 'error', stage1Error: message }));
       setTimeout(exit, 1500);
