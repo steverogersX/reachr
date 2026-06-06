@@ -1,35 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useApp } from 'ink';
-import { Header } from '@/ui/components/Header';
-import { StageBox } from '@/ui/components/StageBox';
-import type { StageItem } from '@/ui/components/StageBox';
-import type { StageStatus, Field, LinkedInProfile, Contact } from '@/services/types';
-import { services } from '@/services/index';
+import React, { useState, useEffect } from "react";
+import { Box, Text, useApp } from "ink";
+import { Header } from "@/ui/components/Header";
+import { StageBox } from "@/ui/components/StageBox";
+import type { StageItem } from "@/ui/components/StageBox";
+import type {
+  StageStatus,
+  DiscoveredDomain,
+  LinkedInProfile,
+  Contact,
+} from "@/services/types";
+import { services } from "@/services/index";
 
 interface Props {
   domain: string;
 }
 
 interface PipelineState {
-  fieldsStatus:   StageStatus;
+  domainsStatus: StageStatus;
   profilesStatus: StageStatus;
-  emailsStatus:   StageStatus;
-  fields:         Field[];
-  profiles:       LinkedInProfile[];
-  contacts:       Contact[];
-  fieldsTiming?:  number;
+  emailsStatus: StageStatus;
+  domains: DiscoveredDomain[];
+  profiles: LinkedInProfile[];
+  contacts: Contact[];
+  domainsTiming?: number;
   profilesTiming?: number;
-  emailsTiming?:  number;
-  error?:         string;
+  emailsTiming?: number;
+  error?: string;
 }
 
 const INITIAL_STATE: PipelineState = {
-  fieldsStatus:   'running',
-  profilesStatus: 'idle',
-  emailsStatus:   'idle',
-  fields:         [],
-  profiles:       [],
-  contacts:       [],
+  domainsStatus: "running",
+  profilesStatus: "idle",
+  emailsStatus: "idle",
+  domains: [],
+  profiles: [],
+  contacts: [],
 };
 
 export function RunPipeline({ domain }: Props) {
@@ -38,46 +43,46 @@ export function RunPipeline({ domain }: Props) {
 
   useEffect(() => {
     runPipeline().catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Unexpected error';
-      setState((s) => ({ ...s, fieldsStatus: 'error', error: message }));
+      const message = err instanceof Error ? err.message : "Unexpected error";
+      setState((s) => ({ ...s, domainsStatus: "error", error: message }));
       setTimeout(exit, 1500);
     });
   }, []);
 
   async function runPipeline() {
-    // ── Stage 1: Fields ────────────────────────────────────────────────────
-    const fieldsStart = Date.now();
-    const fields: Field[] = [];
+    // ── Stage 1: Domain Discovery ──────────────────────────────────────────────
+    const domainsStart = Date.now();
+    const domains: DiscoveredDomain[] = [];
 
-    for await (const field of services.getFields(domain)) {
-      fields.push(field);
-      setState((s) => ({ ...s, fields: [...fields] }));
+    for await (const d of services.getDomains(domain)) {
+      domains.push(d);
+      setState((s) => ({ ...s, domains: [...domains] }));
     }
 
     setState((s) => ({
       ...s,
-      fieldsStatus:   'done',
-      fieldsTiming:   Date.now() - fieldsStart,
-      profilesStatus: 'running',
+      domainsStatus: "done",
+      domainsTiming: Date.now() - domainsStart,
+      profilesStatus: "running",
     }));
 
-    // ── Stage 2: LinkedIn Profiles ─────────────────────────────────────────
+    // ── Stage 2: LinkedIn Profiles ─────────────────────────────────────────────
     const profilesStart = Date.now();
     const profiles: LinkedInProfile[] = [];
 
-    for await (const profile of services.getProfiles(domain, fields)) {
+    for await (const profile of services.getProfiles(domain, domains)) {
       profiles.push(profile);
       setState((s) => ({ ...s, profiles: [...profiles] }));
     }
 
     setState((s) => ({
       ...s,
-      profilesStatus: 'done',
+      profilesStatus: "done",
       profilesTiming: Date.now() - profilesStart,
-      emailsStatus:   'running',
+      emailsStatus: "running",
     }));
 
-    // ── Stage 3: Emails ────────────────────────────────────────────────────
+    // ── Stage 3: Emails ────────────────────────────────────────────────────────
     const emailsStart = Date.now();
     const contacts: Contact[] = [];
 
@@ -88,25 +93,43 @@ export function RunPipeline({ domain }: Props) {
 
     setState((s) => ({
       ...s,
-      emailsStatus:  'done',
-      emailsTiming:  Date.now() - emailsStart,
-      contacts:      [...contacts],
+      emailsStatus: "done",
+      emailsTiming: Date.now() - emailsStart,
+      contacts: [...contacts],
     }));
   }
 
   const {
-    fieldsStatus, profilesStatus, emailsStatus,
-    fields, profiles, contacts,
-    fieldsTiming, profilesTiming, emailsTiming,
+    domainsStatus,
+    profilesStatus,
+    emailsStatus,
+    domains,
+    profiles,
+    contacts,
+    domainsTiming,
+    profilesTiming,
+    emailsTiming,
     error,
   } = state;
 
-  const fieldsItems:   StageItem[] = fields.map((f) => ({ primary: f.name }));
-  const profilesItems: StageItem[] = profiles.map((p) => ({ primary: p.name, secondary: p.title }));
-  const emailsItems:   StageItem[] = contacts.map((c) => ({ primary: c.email, secondary: c.name }));
+  const domainsItems: StageItem[] = domains.map((d) => ({
+    primary: d.name,
+    icon: "🌐",
+  }));
+  const profilesItems: StageItem[] = profiles.map((p) => ({
+    primary: p.name,
+    secondary: p.title,
+  }));
+  const emailsItems: StageItem[] = contacts.map((c) => ({
+    primary: c.email,
+    secondary: c.name,
+  }));
 
-  const allDone = emailsStatus === 'done';
-  const hasError = fieldsStatus === 'error' || profilesStatus === 'error' || emailsStatus === 'error';
+  const allDone = emailsStatus === "done";
+  const hasError =
+    domainsStatus === "error" ||
+    profilesStatus === "error" ||
+    emailsStatus === "error";
 
   return (
     <Box flexDirection="column" paddingX={1} paddingTop={1}>
@@ -114,10 +137,10 @@ export function RunPipeline({ domain }: Props) {
 
       <StageBox
         index={1}
-        title="Discovering Fields"
-        status={fieldsStatus}
-        items={fieldsItems}
-        timing={fieldsTiming}
+        title="Discovering Domains"
+        status={domainsStatus}
+        items={domainsItems}
+        timing={domainsTiming}
         error={error}
       />
 
@@ -141,12 +164,22 @@ export function RunPipeline({ domain }: Props) {
         <Box flexDirection="column" marginTop={1} gap={1}>
           <Box gap={1}>
             <Text color="greenBright">✓</Text>
-            <Text color="white" bold>Pipeline complete</Text>
-            <Text color="gray" dimColor>· {contacts.length} contacts ready</Text>
+            <Text color="white" bold>
+              Pipeline complete
+            </Text>
+            <Text color="gray" dimColor>
+              · {contacts.length} contacts ready
+            </Text>
           </Box>
           <Box marginLeft={2} flexDirection="column">
-            <Text color="gray" dimColor>next  <Text color="white">reachr report</Text>  to review before sending</Text>
-            <Text color="gray" dimColor>next  <Text color="white">reachr send</Text>    to choose a template and send</Text>
+            <Text color="gray" dimColor>
+              next <Text color="white">reachr report</Text> to review before
+              sending
+            </Text>
+            <Text color="gray" dimColor>
+              next <Text color="white">reachr send</Text> to choose a template
+              and send
+            </Text>
           </Box>
         </Box>
       )}
@@ -155,7 +188,9 @@ export function RunPipeline({ domain }: Props) {
         <Box marginTop={1} gap={1}>
           <Text color="redBright">✗</Text>
           <Text color="redBright">Pipeline failed.</Text>
-          <Text color="gray" dimColor>Check the error above.</Text>
+          <Text color="gray" dimColor>
+            Check the error above.
+          </Text>
         </Box>
       )}
 
