@@ -1,10 +1,11 @@
 import React from 'react';
 import { render } from 'ink';
 import { DomainSchema } from '@/services/domains/types';
-import { TaskStore } from '@/pipeline';
+import { TaskStore, PipelineState } from '@/pipeline';
 import { RunView } from '@/ui/RunView';
+import type { WorkflowOptions } from '@/services/runWorkflow';
 
-export async function runCommand(rawDomain: string): Promise<void> {
+export async function runCommand(rawDomain: string, opts: Partial<WorkflowOptions> = {}): Promise<void> {
     const result = DomainSchema.safeParse(rawDomain);
 
     if (!result.success) {
@@ -17,6 +18,7 @@ export async function runCommand(rawDomain: string): Promise<void> {
     }
 
     const store = new TaskStore();
-    const { waitUntilExit } = render(<RunView domain={result.data} store={store} />);
+    const state = new PipelineState();
+    const { waitUntilExit } = render(<RunView domain={result.data} store={store} state={state} opts={opts} />);
     await waitUntilExit();
 }
