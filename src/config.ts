@@ -1,28 +1,55 @@
 import 'dotenv/config';
 import { z } from 'zod';
-import { fatal } from '@/utils/fatal';
 
-const EnvSchema = z.object({
-  MOCK:                     z.enum(['true', 'false']).transform((v) => v === 'true'),
-  COMPANYRICH_API_KEY:      z.string().min(1),
-  PROSPEO_API_KEY:          z.string().min(1),
-  PROSPEO_BASE_URL:         z.url(),
-  PROSPEO_LIMIT:            z.coerce.number().int().min(1).default(50),
-  PROSPEO_MAX_ATTEMPTS:     z.coerce.number().int().min(1).default(3),
-  PROSPEO_BACKOFF_MS:       z.coerce.number().int().min(0).default(800),
-  COMPANYRICH_BASE_URL:     z.url(),
-  COMPANYRICH_MAX_ATTEMPTS: z.coerce.number().int().min(1),
-  COMPANYRICH_BACKOFF_MS:   z.coerce.number().int().min(0),
+const ConfigSchema = z.object({
+    mock: z
+        .string()
+        .default('false')
+        .transform(v => v === 'true'),
+
+    companyRich: z.object({
+        apiKey: z.string().min(1, 'COMPANYRICH_API_KEY is required'),
+        baseUrl: z.string().url('COMPANYRICH_BASE_URL must be a valid URL'),
+        maxAttempts: z.coerce.number().int().min(1).default(3),
+        backoffMs: z.coerce.number().int().min(0).default(1000),
+    }),
+
+    prospeo: z.object({
+        apiKey: z.string().min(1, 'PROSPEO_API_KEY is required'),
+        baseUrl: z.string().url('PROSPEO_BASE_URL must be a valid URL'),
+        limit: z.coerce.number().int().min(1).default(50),
+        maxAttempts: z.coerce.number().int().min(1).default(3),
+        backoffMs: z.coerce.number().int().min(0).default(800),
+    }),
 });
 
-const result = EnvSchema.safeParse(process.env);
+function load() {
+    const result = ConfigSchema.safeParse({
+        mock: process.env.MOCK,
+        companyRich: {
+            apiKey: process.env.COMPANYRICH_API_KEY,
+            baseUrl: process.env.COMPANYRICH_BASE_URL,
+            maxAttempts: process.env.COMPANYRICH_MAX_ATTEMPTS,
+            backoffMs: process.env.COMPANYRICH_BACKOFF_MS,
+        },
+        prospeo: {
+            apiKey: process.env.PROSPEO_API_KEY,
+            baseUrl: process.env.PROSPEO_BASE_URL,
+            limit: process.env.PROSPEO_LIMIT,
+            maxAttempts: process.env.PROSPEO_MAX_ATTEMPTS,
+            backoffMs: process.env.PROSPEO_BACKOFF_MS,
+        },
+    });
 
-if (!result.success) {
-  const missing = result.error.issues.map((i) => i.path.join('.')).join(', ');
-  fatal('Missing required environment variables', {
-    got:  missing,
-    hint: 'Check your .env file.',
-  });
+    if (!result.success) {
+        const issues = result.error.issues
+            .map(i => `  • ${i.path.join('.')}: ${i.message}`)
+            .join('\n');
+        throw new Error(`Invalid configuration:\n${issues}`);
+    }
+
+    return result.data;
 }
 
-export const config = result.data;
+export const config = load();
+export type Config = typeof config;
