@@ -38,12 +38,14 @@ export async function withRetry<T = unknown>(
         }
 
         try {
+            const customHeaders = opts.headers ?? {};
+            const hasCustomAuth = 'X-KEY' in customHeaders || 'Authorization' in customHeaders;
             const response = await fetch(fullUrl, {
                 method: opts.method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                    ...opts.headers,
+                    ...(hasCustomAuth ? {} : { 'Authorization': `Bearer ${apiKey}` }),
+                    ...customHeaders,
                 },
                 body: opts.method !== 'GET' ? JSON.stringify(body) : undefined,
             });

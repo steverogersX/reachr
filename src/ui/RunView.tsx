@@ -56,21 +56,32 @@ function LeafItem({ task, isLast }: { task: Task; isLast: boolean }) {
     );
 }
 
+function ErrorLine({ error }: { error: Error }) {
+    return (
+        <Box paddingLeft={4}>
+            <Text color="red" dimColor>{error.message}</Text>
+        </Box>
+    );
+}
+
 function GroupItem({ task, isLast }: { task: Task; isLast: boolean }) {
     return (
-        <Thread.Item
-            label={task.label}
-            status={toStatus(task.status)}
-            isLast={isLast}
-        >
-            {task.subtasks.map((child, i) => (
-                <LeafItem
-                    key={child.id}
-                    task={child}
-                    isLast={i === task.subtasks.length - 1}
-                />
-            ))}
-        </Thread.Item>
+        <>
+            <Thread.Item
+                label={task.label}
+                status={toStatus(task.status)}
+                isLast={isLast && !task.error}
+            >
+                {task.subtasks.map((child, i) => (
+                    <LeafItem
+                        key={child.id}
+                        task={child}
+                        isLast={i === task.subtasks.length - 1}
+                    />
+                ))}
+            </Thread.Item>
+            {task.error && <ErrorLine error={task.error} />}
+        </>
     );
 }
 

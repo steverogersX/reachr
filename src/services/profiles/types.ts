@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 export const LinkedinProfileSchema = z.object({
-    name: z.string(),
-    title: z.string(),
+    personId:   z.string(),
+    name:       z.string(),
+    title:      z.string(),
+    headline:   z.string(),
     profileUrl: z.string().url(),
 });
 export type LinkedinProfile = z.infer<typeof LinkedinProfileSchema>;

@@ -5,11 +5,13 @@ import { withRetry } from "@/utils/http";
 
 
 const ProspeoPersonRecordSchema = z.object({
-    full_name: z.string().optional(),
-    first_name: z.string().optional(),
-    last_name: z.string().optional(),
-    linkedin_url: z.string().optional(),
+    person_id:         z.string().optional(),
+    full_name:         z.string().optional(),
+    first_name:        z.string().optional(),
+    last_name:         z.string().optional(),
+    linkedin_url:      z.string().optional(),
     current_job_title: z.string().optional(),
+    headline:          z.string().optional(),
 });
 
 const ProspeoResponseSchema = z.object({
@@ -25,13 +27,23 @@ const ProspeoResponseSchema = z.object({
 export class ProspeoProfileDiscoveryProvider implements LinkedinDiscoveryProvider {
     private readonly cfg = config.prospeo;
 
-    async discoverLinkedinProfiles(domain: string, maxResultsPerDomain = 5): Promise<LinkedinProfile[]> {
+    async discoverLinkedinProfiles(domain: string, maxResults = 10): Promise<LinkedinProfile[]> {
+        const limit = Math.min(maxResults, 10);
         const data = await withRetry(
             `${this.cfg.baseUrl}/search-person`,
             this.cfg.apiKey,
-            { domain, maxResultsPerDomain },
+            {
+                page: 1,
+                limit,
+                filters: {
+                    company: {
+                        websites: { include: [domain] },
+                    },
+                },
+            },
             undefined,
             {
+                headers: { 'X-KEY': this.cfg.apiKey },
                 maxRetries: this.cfg.maxAttempts - 1,
                 initialDelayMs: this.cfg.backoffMs,
             },
@@ -45,8 +57,14 @@ export class ProspeoProfileDiscoveryProvider implements LinkedinDiscoveryProvide
 
         return (parsed.data.results ?? []).flatMap(({ person }) => {
             const name = person.full_name ?? [person.first_name, person.last_name].filter(Boolean).join(' ');
-            if (!name || !person.linkedin_url) return [];
-            return [{ name, title: person.current_job_title ?? '', profileUrl: person.linkedin_url }];
+            if (!name || !person.linkedin_url || !person.person_id) return [];
+            return [{
+                personId:   person.person_id,
+                name,
+                title:      person.current_job_title ?? '',
+                headline:   person.headline ?? '',
+                profileUrl: person.linkedin_url,
+            }];
         });
     }
 }

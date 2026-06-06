@@ -24,20 +24,24 @@ export async function runWorkflow(seedDomain: Domain, store: TaskStore): Promise
         try {
             const profiles = await profileProvider.discoverLinkedinProfiles(domain);
 
-            for (const profile of profiles) {
-                store.add(
-                    {
-                        id: `profile:${domain}:${profile.name}`,
-                        label: profile.name,
-                        status: 'done',
-                        data: profile,
-                        meta: profile.title,
-                        right: profile.profileUrl,
-                    },
-                    `profiles:${domain}`,
-                );
+            if (profiles.length === 0) {
+                store.update(`profiles:${domain}`, { status: 'skipped', meta: 'no contacts found' });
+            } else {
+                for (const profile of profiles) {
+                    store.add(
+                        {
+                            id:     `profile:${domain}:${profile.name}`,
+                            label:  profile.name,
+                            status: 'done',
+                            data:   profile,
+                            meta:   profile.title,
+                            right:  profile.profileUrl,
+                        },
+                        `profiles:${domain}`,
+                    );
+                }
+                store.update(`profiles:${domain}`, { status: 'done' });
             }
-            store.update(`profiles:${domain}`, { status: 'done' });
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
             store.update(`profiles:${domain}`, { status: 'error', error });
