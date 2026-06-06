@@ -1,7 +1,9 @@
 import { config }                             from '@/config';
 import { MockDomainDiscoveryProvider }        from '@/services/domains/providers/MockDomainDiscoveryProvider';
 import { CompanyRichDomainDiscoveryProvider } from '@/services/domains/providers/CompanyRichDomainDiscoveryProvider';
-import { mockProfiles, mockEmails }           from '@/mock/index';
+import { ProspeoProfileDiscoveryProvider }    from '@/services/profiles/providers/ProspeoProfileDiscoveryProvider';
+import { MockProfileDiscoveryProvider }       from '@/services/profiles/providers/MockProfileDiscoveryProvider';
+import { mockEmails }                         from '@/mock/index';
 import type { ReachServices }                 from '@/services/types';
 
 const domainProvider = config.MOCK
@@ -13,9 +15,19 @@ const domainProvider = config.MOCK
       backoffMs:   config.COMPANYRICH_BACKOFF_MS,
     });
 
+const profileProvider = config.MOCK
+  ? new MockProfileDiscoveryProvider()
+  : new ProspeoProfileDiscoveryProvider({
+      apiKey:      config.PROSPEO_API_KEY,
+      baseUrl:     config.PROSPEO_BASE_URL,
+      limit:       config.PROSPEO_LIMIT,
+      maxAttempts: config.PROSPEO_MAX_ATTEMPTS,
+      backoffMs:   config.PROSPEO_BACKOFF_MS,
+    });
+
 export const services: ReachServices = {
   getDomains:  (domain, options)  => domainProvider.discover(domain, options),
-  getProfiles: (domain, domains)  => mockProfiles(domain, domains),
+  getProfiles: (domain, domains)  => profileProvider.discover(domain, domains),
   getEmails:   (domain, profiles) => mockEmails(domain, profiles),
 };
 
