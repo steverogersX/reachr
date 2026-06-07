@@ -18,6 +18,8 @@ const CacheEntrySchema = z.object({
         title:       z.string(),
         linkedinUrl: z.string(),
         email:       z.string().optional(),
+        sentAt:      z.string().optional(),
+        messageId:   z.string().optional(),
     })),
 });
 
