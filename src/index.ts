@@ -1,9 +1,26 @@
 import { Command } from 'commander';
+import chalk from 'chalk';
+
+const accent = chalk.cyanBright;
+const dim    = chalk.gray;
+const bold   = chalk.bold;
 
 const program = new Command()
     .name('reachr')
-    .description('LinkedIn outreach pipeline — discover domains and profiles')
-    .version('1.0.0', '-v, --version');
+    .description('LinkedIn outreach pipeline — discover domains, find profiles, and send outreach emails')
+    .version('1.0.0', '-v, --version')
+    .configureHelp({
+        styleTitle:                str => bold.white(str),
+        styleUsage:                str => dim(str),
+        styleCommandText:          str => accent(bold(str)),
+        styleSubcommandText:       str => accent(bold(str)),
+        styleCommandDescription:   str => dim(str),
+        styleSubcommandDescription: str => dim(str),
+        styleOptionTerm:           str => chalk.white(str),
+        styleOptionDescription:    str => dim(str),
+        styleArgumentTerm:         str => chalk.white(str),
+        styleArgumentDescription:  str => dim(str),
+    });
 
 program
     .command('run <domain>')
@@ -19,7 +36,7 @@ program
             });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            process.stderr.write(`\n  ${msg}\n\n`);
+            process.stderr.write(`\n  ${chalk.red(msg)}\n\n`);
             process.exit(1);
         }
     });
@@ -33,7 +50,7 @@ program
             await exportCommand();
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            process.stderr.write(`\n  ${msg}\n\n`);
+            process.stderr.write(`\n  ${chalk.red(msg)}\n\n`);
             process.exit(1);
         }
     });
@@ -47,7 +64,7 @@ program
             await clearCacheCommand(domain);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            process.stderr.write(`\n  ${msg}\n\n`);
+            process.stderr.write(`\n  ${chalk.red(msg)}\n\n`);
             process.exit(1);
         }
     });
@@ -61,7 +78,7 @@ program
             await reportCommand(domain);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            process.stderr.write(`\n  ${msg}\n\n`);
+            process.stderr.write(`\n  ${chalk.red(msg)}\n\n`);
             process.exit(1);
         }
     });
@@ -75,21 +92,28 @@ program
             await previewEmailCommand(template, to);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            process.stderr.write(`\n  ${msg}\n\n`);
+            process.stderr.write(`\n  ${chalk.red(msg)}\n\n`);
             process.exit(1);
         }
     });
 
+function example(cmd: string, comment?: string): string {
+    const line = `  ${chalk.gray('$')} ${accent(cmd)}`;
+    return comment ? `${line}${dim(`  # ${comment}`)}` : line;
+}
+
+program.addHelpText('beforeAll', `\n${bold.white('reachr')}  ${dim('— LinkedIn outreach, end to end')}\n`);
+
 program.addHelpText('after', `
-Examples:
-  $ reachr run stripe.com
-  $ reachr run stripe.com --max-domains 8 --max-profiles 5
-  $ reachr export
-  $ reachr clear-cache               # clear all cached results
-  $ reachr clear-cache stripe.com    # clear cache for a single domain
-  $ reachr report stripe.com         # show per-stage results from the latest run
-  $ docker compose up -d            # start MailDev for local email testing
-  $ reachr preview-email coldOutreach you@example.com
+${bold.white('Examples')}
+${example('reachr run stripe.com')}
+${example('reachr run stripe.com --max-domains 8 --max-profiles 5')}
+${example('reachr export')}
+${example('reachr clear-cache', 'clear all cached results')}
+${example('reachr clear-cache stripe.com', 'clear cache for a single domain')}
+${example('reachr report stripe.com', 'show per-stage results from the latest run')}
+${example('docker compose up -d', 'start MailDev for local email testing')}
+${example('reachr preview-email coldOutreach you@example.com')}
 `);
 
 program.parse();
