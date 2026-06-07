@@ -1,11 +1,23 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+const optionalBool = z.string().optional().transform(v => (v === undefined ? undefined : v === 'true'));
+
 const ConfigSchema = z.object({
     mock: z
-        .string()
-        .default('false')
-        .transform(v => v === 'true'),
+        .object({
+            global:   z.string().default('false').transform(v => v === 'true'),
+            domains:  optionalBool,
+            profiles: optionalBool,
+            emails:   optionalBool,
+            send:     optionalBool,
+        })
+        .transform(m => ({
+            domains:  m.domains  ?? m.global,
+            profiles: m.profiles ?? m.global,
+            emails:   m.emails   ?? m.global,
+            send:     m.send     ?? m.global,
+        })),
 
     companyRich: z.object({
         apiKey: z.string().min(1, 'COMPANYRICH_API_KEY is required'),
@@ -49,7 +61,13 @@ const ConfigSchema = z.object({
 
 function load() {
     const result = ConfigSchema.safeParse({
-        mock: process.env.MOCK,
+        mock: {
+            global:   process.env.MOCK,
+            domains:  process.env.MOCK_DOMAINS,
+            profiles: process.env.MOCK_PROFILES,
+            emails:   process.env.MOCK_EMAILS,
+            send:     process.env.MOCK_SEND,
+        },
         companyRich: {
             apiKey: process.env.COMPANYRICH_API_KEY,
             baseUrl: process.env.COMPANYRICH_BASE_URL,

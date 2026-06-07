@@ -7,5 +7,5 @@ export * from './types';
 export { ProspeoProfileDiscoveryProvider } from './providers/ProspeoProvider';
 
 export function createProfileDiscoveryProvider(): LinkedinDiscoveryProvider {
-    return config.mock ? new MockLinkedinDiscoveryProvider() : new ProspeoProfileDiscoveryProvider();
+    return config.mock.profiles ? new MockLinkedinDiscoveryProvider() : new ProspeoProfileDiscoveryProvider();
 }

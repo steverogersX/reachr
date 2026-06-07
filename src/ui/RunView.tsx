@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useApp } from 'ink';
+import React, { useState, useEffect, useRef } from 'react';
+import { Box, Text, Static, useApp } from 'ink';
 import { ConfirmInput } from '@inkjs/ui';
 import { Thread } from '@/ui/thread';
-import { icons } from '@/ui/icons';
+import { glyph, color } from '@/ui/theme';
 import { runWorkflow, runSendStage, type WorkflowOptions } from '@/services/runWorkflow';
 import { TaskStore, PipelineState, type Task, type TaskStatus } from '@/pipeline';
 import type { Domain } from '@/services/domains/types';
@@ -15,7 +15,17 @@ function toStatus(s: TaskStatus): Status {
     if (s === 'running') return 'loading';
     if (s === 'done')    return 'done';
     if (s === 'error')   return 'error';
+    if (s === 'skipped') return 'skipped';
     return 'idle';
+}
+
+// done / total across a stage's direct children, for the trailing "n found" hint
+function tally(task: Task): { done: number; total: number } {
+    const leaves = task.subtasks.flatMap(t => (t.subtasks.length > 0 ? t.subtasks : [t]));
+    return {
+        done:  leaves.filter(t => t.status === 'done').length,
+        total: leaves.length,
+    };
 }
 
 // --- sub-components ---
@@ -24,24 +34,23 @@ function Header({ domain }: { domain: string }) {
     const width = Math.min(process.stdout.columns ?? 60, 80);
     return (
         <Box flexDirection="column" marginBottom={1}>
-            <Box gap={1}>
-                <Text bold color="cyan">reachr</Text>
-                <Text dimColor>{icons.sep}</Text>
-                <Text bold>{domain}</Text>
+            <Box>
+                <Text bold color={color.text}>{glyph.brand} reachr</Text>
+                <Text color={color.muted} dimColor>  {glyph.sep}  </Text>
+                <Text color={color.muted}>{domain}</Text>
             </Box>
-            <Text dimColor>{'─'.repeat(width)}</Text>
+            <Text color={color.muted} dimColor>{glyph.bar.repeat(width)}</Text>
         </Box>
     );
 }
 
 function FatalError({ error }: { error: Error }) {
     return (
-        <Box flexDirection="column" gap={1}>
-            <Box gap={1}>
-                <Text color="red">{icons.dot}</Text>
-                <Text bold color="red">Error</Text>
+        <Box flexDirection="column" marginTop={1}>
+            <Text bold color={color.error}>Error</Text>
+            <Box marginTop={1}>
+                <Text color={color.muted}>{error.message}</Text>
             </Box>
-            <Text dimColor>  {error.message}</Text>
         </Box>
     );
 }
@@ -51,7 +60,7 @@ function LeafItem({ task, isLast }: { task: Task; isLast: boolean }) {
         <Thread.Item
             label={task.label}
             meta={task.meta}
-            right={task.right ? <Text dimColor>{task.right}</Text> : undefined}
+            right={task.right}
             status={toStatus(task.status)}
             isLast={isLast}
         />
@@ -60,8 +69,8 @@ function LeafItem({ task, isLast }: { task: Task; isLast: boolean }) {
 
 function ErrorLine({ error }: { error: Error }) {
     return (
-        <Box paddingLeft={4}>
-            <Text color="red" dimColor>{error.message}</Text>
+        <Box paddingLeft={5}>
+            <Text color={color.error}>{error.message}</Text>
         </Box>
     );
 }
@@ -87,11 +96,23 @@ function GroupItem({ task, isLast }: { task: Task; isLast: boolean }) {
     );
 }
 
+function stageCountNode(task: Task): React.ReactNode {
+    if (task.status !== 'done' || task.subtasks.length === 0) return undefined;
+    const { done, total } = tally(task);
+    if (total === 0) return undefined;
+    const label = done === total ? `${total}` : `${done}/${total}`;
+    return <Text color={color.muted} dimColor>{glyph.sep} {label}</Text>;
+}
+
 function Stage({ task }: { task: Task }) {
     const hasGroups = task.subtasks.some(t => t.subtasks.length > 0);
     return (
         <Box flexDirection="column" marginBottom={1}>
-            <Thread.Stage label={task.label} status={toStatus(task.status)} />
+            <Thread.Stage
+                label={task.label}
+                status={toStatus(task.status)}
+                count={stageCountNode(task)}
+            />
             {task.subtasks.length > 0 && (
                 <Thread>
                     {task.subtasks.map((item, i) => {
@@ -119,52 +140,80 @@ type Phase = 'discovering' | 'confirm-send' | 'sending' | 'cancelled' | 'done';
 
 function SendPrompt({ count, onConfirm, onCancel }: { count: number; onConfirm: () => void; onCancel: () => void }) {
     return (
-        <Box flexDirection="column" marginTop={1} gap={1}>
-            <Text>
-                Send outreach emails to <Text bold>{count}</Text> {count === 1 ? 'profile' : 'profiles'}? <Text dimColor>(Y/n)</Text>
-            </Text>
-            <ConfirmInput onConfirm={onConfirm} onCancel={onCancel} />
+        <Box flexDirection="column" marginTop={1}>
+            <Box>
+                <Text color={color.muted}>{glyph.arrow} </Text>
+                <Text color={color.text}>Send outreach emails to </Text>
+                <Text bold color={color.text}>{count}</Text>
+                <Text color={color.text}> {count === 1 ? 'profile' : 'profiles'}?</Text>
+                <Text color={color.muted} dimColor>  (Y/n)</Text>
+            </Box>
+            <Box marginTop={1}>
+                <ConfirmInput onConfirm={onConfirm} onCancel={onCancel} />
+            </Box>
         </Box>
     );
 }
 
 function CancelledNotice() {
     return (
-        <Box marginTop={1} gap={1}>
-            <Text color="yellow">{icons.dot}</Text>
-            <Text dimColor>Cancelled — no emails were sent.</Text>
+        <Box marginTop={1}>
+            <Text color={color.muted}>{glyph.arrow} Cancelled — no emails were sent.</Text>
+        </Box>
+    );
+}
+
+function DoneSummary({ sent, failed }: { sent: number; failed: number }) {
+    return (
+        <Box marginTop={1}>
+            <Text bold color={color.success}>Done</Text>
+            <Text color={color.muted} dimColor>  {glyph.sep}  </Text>
+            <Text color={color.muted}>{sent} sent</Text>
+            {failed > 0 && (
+                <>
+                    <Text color={color.muted} dimColor>  {glyph.sep}  </Text>
+                    <Text color={color.error}>{failed} failed</Text>
+                </>
+            )}
         </Box>
     );
 }
 
 export function RunView({ domain, store, state, opts }: RunViewProps) {
     const { exit } = useApp();
-    const [tasks, setTasks]           = useState<Task[]>([]);
-    const [fatalError, setFatalError] = useState<Error | null>(null);
-    const [phase, setPhase]           = useState<Phase>('discovering');
+    const [staticTasks, setStaticTasks] = useState<Task[]>([]);
+    const [liveTasks, setLiveTasks]     = useState<Task[]>([]);
+    const [fatalError, setFatalError]   = useState<Error | null>(null);
+    const [phase, setPhase]             = useState<Phase>('discovering');
+    const committedIds                  = useRef(new Set<string>());
 
     const sendable = state.profiles.filter(p => p.email && !p.sentAt).length;
     const wantsSend = sendable > 0;
 
     useEffect(() => {
-        // Ink repaints the whole region on every render; the store can emit
-        // 'change' dozens of times per second (per profile/email/send), and
-        // each repaint floods the terminal scrollback and snaps it to the
-        // bottom. Throttling re-renders keeps the UI responsive to scrolling.
-        let pending: Task[] | null = null;
-        let timer: ReturnType<typeof setTimeout> | null = null;
-
-        const flush = () => {
-            timer = null;
-            if (pending) {
-                setTasks(pending);
-                pending = null;
-            }
-        };
+        // Ink repaints its whole live tree on every render. Pushing finished
+        // stages into <Static> writes them to the terminal exactly once —
+        // they become permanent scrollback that Ink never rewrites — so the
+        // repainted "live" region stays small and scrolling stays smooth.
+        const isTerminal = (status: TaskStatus) =>
+            status === 'done' || status === 'error' || status === 'skipped';
 
         const onChange = (t: Task[]) => {
-            pending = [...t];
-            if (!timer) timer = setTimeout(flush, 100);
+            const newlyDone: Task[] = [];
+            const stillLive: Task[] = [];
+
+            for (const task of t) {
+                if (committedIds.current.has(task.id)) continue;
+                if (isTerminal(task.status)) {
+                    committedIds.current.add(task.id);
+                    newlyDone.push(task);
+                } else {
+                    stillLive.push(task);
+                }
+            }
+
+            if (newlyDone.length > 0) setStaticTasks(prev => [...prev, ...newlyDone]);
+            setLiveTasks(stillLive);
         };
         store.on('change', onChange);
 
@@ -183,10 +232,7 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
                 setTimeout(() => exit(error), 1500);
             });
 
-        return () => {
-            store.off('change', onChange);
-            if (timer) clearTimeout(timer);
-        };
+        return () => { store.off('change', onChange); };
     }, []);
 
     const handleConfirm = () => {
@@ -208,15 +254,18 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
         setTimeout(() => exit(), 500);
     };
 
-    const sendTask    = tasks.find(task => task.id === 'stage:send');
-    const otherTasks  = tasks.filter(task => task.id !== 'stage:send');
+    const sendTask = staticTasks.find(t => t.id === 'stage:send') ?? liveTasks.find(t => t.id === 'stage:send');
+    const isSend   = (task: Task) => task.id === 'stage:send';
 
     return (
         <Box flexDirection="column" paddingX={1} paddingTop={1}>
             <Header domain={domain} />
+            <Static items={staticTasks.filter(task => !isSend(task))}>
+                {task => <Stage key={task.id} task={task} />}
+            </Static>
             {fatalError
                 ? <FatalError error={fatalError} />
-                : otherTasks.map(task => <Stage key={task.id} task={task} />)
+                : liveTasks.filter(task => !isSend(task)).map(task => <Stage key={task.id} task={task} />)
             }
             {phase !== 'discovering' && <ResultsTable profiles={state.profiles} />}
             {phase === 'confirm-send' && wantsSend && (
@@ -224,6 +273,12 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
             )}
             {sendTask && <Stage task={sendTask} />}
             {phase === 'cancelled' && <CancelledNotice />}
+            {phase === 'done' && sendTask && (
+                <DoneSummary
+                    sent={state.profiles.filter(p => p.sentAt).length}
+                    failed={(sendTask.subtasks ?? []).filter(t => t.status === 'error').length}
+                />
+            )}
         </Box>
     );
 }
