@@ -6,13 +6,23 @@ export const RequestOptionsSchema = z.object({
     maxRetries: z.number().int().min(0).default(3),
     initialDelayMs: z.number().int().min(0).default(1000),
     backoffFactor: z.number().min(1).default(2),
-    retryStatusCodes: z.array(z.number().int()).default([429, 500, 502, 503, 504]),
+    // Only rate-limit responses are worth retrying with backoff — anything else
+    // (bad request, auth, server errors) is a definitive failure, not a transient one.
+    retryStatusCodes: z.array(z.number().int()).default([429]),
 });
 
 export type RequestOptions = z.infer<typeof RequestOptionsSchema>;
 
+export interface RetryInfo {
+    attempt:    number; // the retry attempt about to be made (1-based)
+    maxRetries: number;
+    delayMs:    number;
+    status:     number;
+}
+
 type WithRetryOptions<T> = Partial<RequestOptions> & {
     responseSchema?: z.ZodType<T>;
+    onRetry?: (info: RetryInfo) => void;
 };
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -24,53 +34,46 @@ export async function withRetry<T = unknown>(
     params?: Record<string, string | number>,
     options?: WithRetryOptions<T>,
 ): Promise<T> {
-    const { responseSchema, ...rawOpts } = options ?? {};
+    const { responseSchema, onRetry, ...rawOpts } = options ?? {};
     const opts = RequestOptionsSchema.parse(rawOpts);
 
     const fullUrl = buildUrl(url, params);
 
-    let lastError: Error = new Error('Request failed');
+    const customHeaders = opts.headers ?? {};
+    const hasCustomAuth = 'X-KEY' in customHeaders || 'Authorization' in customHeaders;
 
     for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
-        if (attempt > 0) {
-            const delay = opts.initialDelayMs * Math.pow(opts.backoffFactor, attempt - 1);
-            await sleep(delay);
+        const response = await fetch(fullUrl, {
+            method: opts.method,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(hasCustomAuth ? {} : { 'Authorization': `Bearer ${apiKey}` }),
+                ...customHeaders,
+            },
+            body: opts.method !== 'GET' ? JSON.stringify(body) : undefined,
+        });
+
+        // Rate limits are transient — back off and retry. Everything else
+        // (bad request, auth, server errors) is a definitive failure: fail fast.
+        if (opts.retryStatusCodes.includes(response.status)) {
+            const error = new HttpError(response.status, response.statusText);
+            if (attempt === opts.maxRetries) throw error;
+
+            const delayMs = opts.initialDelayMs * Math.pow(opts.backoffFactor, attempt);
+            onRetry?.({ attempt: attempt + 1, maxRetries: opts.maxRetries, delayMs, status: response.status });
+            await sleep(delayMs);
+            continue;
         }
 
-        try {
-            const customHeaders = opts.headers ?? {};
-            const hasCustomAuth = 'X-KEY' in customHeaders || 'Authorization' in customHeaders;
-            const response = await fetch(fullUrl, {
-                method: opts.method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(hasCustomAuth ? {} : { 'Authorization': `Bearer ${apiKey}` }),
-                    ...customHeaders,
-                },
-                body: opts.method !== 'GET' ? JSON.stringify(body) : undefined,
-            });
-
-            if (opts.retryStatusCodes.includes(response.status)) {
-                lastError = new HttpError(response.status, response.statusText);
-                continue;
-            }
-
-            if (!response.ok) {
-                throw new HttpError(response.status, response.statusText);
-            }
-
-            const json: unknown = await response.json();
-            return responseSchema ? responseSchema.parse(json) : (json as T);
-        } catch (err) {
-            if (err instanceof HttpError && !opts.retryStatusCodes.includes(err.status)) {
-                throw err;
-            }
-            if (err instanceof Error) lastError = err;
-            if (attempt === opts.maxRetries) throw lastError;
+        if (!response.ok) {
+            throw new HttpError(response.status, response.statusText);
         }
+
+        const json: unknown = await response.json();
+        return responseSchema ? responseSchema.parse(json) : (json as T);
     }
 
-    throw lastError;
+    throw new Error('Request failed');
 }
 
 export class HttpError extends Error {

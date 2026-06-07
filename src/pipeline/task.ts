@@ -1,4 +1,4 @@
-export type TaskStatus = 'pending' | 'running' | 'done' | 'error' | 'skipped';
+export type TaskStatus = 'pending' | 'running' | 'retrying' | 'done' | 'error' | 'skipped';
 
 export interface Task<TData = unknown> {
     id:       string;

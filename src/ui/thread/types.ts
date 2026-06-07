@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type Status = 'idle' | 'loading' | 'done' | 'error' | 'skipped';
+export type Status = 'idle' | 'loading' | 'retrying' | 'done' | 'error' | 'skipped';
 
 export interface ThreadContextValue {
     depth: number;

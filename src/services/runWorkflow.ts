@@ -44,7 +44,7 @@ export async function runSendStage(seedDomain: Domain, store: TaskStore, state: 
             store.update(taskId, { status: 'done', right: record.email });
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
-            store.update(taskId, { status: 'error', error });
+            store.update(taskId, { status: 'error', meta: `couldn't send to ${record.email}`, error });
         }
     })));
 
@@ -92,10 +92,15 @@ export async function runWorkflow(
         store.add({ id: `profiles:${domain}`, label: domain, status: 'running' }, 'stage:profiles');
 
         try {
-            const profiles = await profileProvider.discoverLinkedinProfiles(domain, MAX_PROFILES);
+            const profiles = await profileProvider.discoverLinkedinProfiles(domain, MAX_PROFILES, ({ attempt, maxRetries, delayMs }) => {
+                store.update(`profiles:${domain}`, {
+                    status: 'retrying',
+                    meta:   `rate limited · retrying in ${Math.round(delayMs / 1000)}s (${attempt}/${maxRetries})`,
+                });
+            });
 
             if (profiles.length === 0) {
-                store.update(`profiles:${domain}`, { status: 'skipped', meta: 'no contacts found' });
+                store.update(`profiles:${domain}`, { status: 'skipped', meta: `no data was found for ${domain}` });
             } else {
                 for (const profile of profiles) {
                     store.add(
@@ -120,7 +125,7 @@ export async function runWorkflow(
             }
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
-            store.update(`profiles:${domain}`, { status: 'error', error });
+            store.update(`profiles:${domain}`, { status: 'error', meta: `couldn't load profiles for ${domain}`, error });
         }
     }
 
@@ -135,7 +140,7 @@ export async function runWorkflow(
         store.add({ id: taskId, label: record.name, status: 'running' }, 'stage:emails');
 
         if (!personId) {
-            store.update(taskId, { status: 'skipped', meta: 'missing person id' });
+            store.update(taskId, { status: 'skipped', meta: `no profile data to enrich ${record.name} from` });
             continue;
         }
 
@@ -145,11 +150,11 @@ export async function runWorkflow(
                 state.updateEmail(record.linkedinUrl, email);
                 store.update(taskId, { status: 'done', right: email });
             } else {
-                store.update(taskId, { status: 'skipped', meta: 'no email found' });
+                store.update(taskId, { status: 'skipped', meta: `no email was found for ${record.name}` });
             }
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
-            store.update(taskId, { status: 'error', error });
+            store.update(taskId, { status: 'error', meta: `couldn't enrich email for ${record.name}`, error });
         }
     }
 

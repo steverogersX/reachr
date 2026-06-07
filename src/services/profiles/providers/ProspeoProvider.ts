@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { config } from "@/config";
 import { LinkedinDiscoveryProvider, LinkedinProfile } from "../types";
-import { withRetry } from "@/utils/http";
+import { withRetry, type RetryInfo } from "@/utils/http";
 
 
 const ProspeoPersonRecordSchema = z.object({
@@ -27,7 +27,7 @@ const ProspeoResponseSchema = z.object({
 export class ProspeoProfileDiscoveryProvider implements LinkedinDiscoveryProvider {
     private readonly cfg = config.prospeo;
 
-    async discoverLinkedinProfiles(domain: string, maxResults = 10): Promise<LinkedinProfile[]> {
+    async discoverLinkedinProfiles(domain: string, maxResults = 10, onRetry?: (info: RetryInfo) => void): Promise<LinkedinProfile[]> {
         const data = await withRetry(
             `${this.cfg.baseUrl}/search-person`,
             this.cfg.apiKey,
@@ -45,6 +45,7 @@ export class ProspeoProfileDiscoveryProvider implements LinkedinDiscoveryProvide
                 headers: { 'X-KEY': this.cfg.apiKey },
                 maxRetries: this.cfg.maxAttempts - 1,
                 initialDelayMs: this.cfg.backoffMs,
+                onRetry,
             },
         );
 

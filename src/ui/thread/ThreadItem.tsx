@@ -6,7 +6,7 @@ import { glyph, color } from "../theme";
 import type { Status, ThreadItemProps } from "./types";
 
 function StatusDot({ status }: { status: Status }) {
-    if (status === "loading") return <Spinner />;
+    if (status === "loading" || status === "retrying") return <Spinner />;
     const tint = status === "done"  ? color.success
                : status === "error" ? color.error
                :                      color.muted;

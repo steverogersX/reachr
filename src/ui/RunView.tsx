@@ -12,7 +12,8 @@ import { ResultsTable } from '@/ui/ResultsTable';
 // --- status mapping ---
 
 function toStatus(s: TaskStatus): Status {
-    if (s === 'running') return 'loading';
+    if (s === 'running')  return 'loading';
+    if (s === 'retrying') return 'retrying';
     if (s === 'done')    return 'done';
     if (s === 'error')   return 'error';
     if (s === 'skipped') return 'skipped';
@@ -57,13 +58,16 @@ function FatalError({ error }: { error: Error }) {
 
 function LeafItem({ task, isLast }: { task: Task; isLast: boolean }) {
     return (
-        <Thread.Item
-            label={task.label}
-            meta={task.meta}
-            right={task.right}
-            status={toStatus(task.status)}
-            isLast={isLast}
-        />
+        <>
+            <Thread.Item
+                label={task.label}
+                meta={task.meta}
+                right={task.right}
+                status={toStatus(task.status)}
+                isLast={isLast && !task.error}
+            />
+            {task.error && <ErrorLine error={task.error} />}
+        </>
     );
 }
 

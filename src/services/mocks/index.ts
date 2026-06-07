@@ -1,12 +1,10 @@
 import type { Domain, DomainDiscoveryProvider } from '../domains/types';
 import type { LinkedinDiscoveryProvider, LinkedinProfile } from '../profiles/types';
-import type { EmailDiscoveryProvider, EmailSendProvider } from '../emails/types';
-import type { RenderedEmail } from '../emails/templates/render';
+import type { EmailDiscoveryProvider } from '../emails/types';
 
 const FIRST_NAMES = ['Avery', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Quinn', 'Reese', 'Skyler', 'Dakota', 'Rowan'];
 const LAST_NAMES  = ['Carter', 'Bennett', 'Hayes', 'Mercer', 'Sloane', 'Pierce', 'Whitman', 'Lange', 'Doyle', 'Marsh'];
 const TITLES      = ['Head of Growth', 'VP of Sales', 'Marketing Director', 'Founder', 'Product Lead', 'CTO', 'Head of Partnerships'];
-const PREFIXES    = ['get', 'try', 'use', 'go', 'join', 'meet', 'with'];
 
 function delay(minMs: number, maxMs: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, minMs + Math.random() * (maxMs - minMs)));
@@ -24,12 +22,14 @@ function slugify(value: string): string {
     return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-export class MockDomainDiscoveryProvider implements DomainDiscoveryProvider {
-    async discoverLookalikeDomains(domain: Domain, maxResults = 5): Promise<Domain[]> {
-        await delay(300, 900);
-        if (fails(0.15)) throw new Error(`mock: lookalike domain lookup failed for ${domain}`);
+const MOCK_DOMAIN = 'starbucks.com' as Domain;
 
-        return Array.from({ length: maxResults }, (_, i) => `${PREFIXES[i % PREFIXES.length]}-${domain}` as Domain);
+export class MockDomainDiscoveryProvider implements DomainDiscoveryProvider {
+    async discoverLookalikeDomains(_domain: Domain, _maxResults = 5): Promise<Domain[]> {
+        await delay(300, 900);
+        if (fails(0.15)) throw new Error(`mock: lookalike domain lookup failed for ${MOCK_DOMAIN}`);
+
+        return [MOCK_DOMAIN];
     }
 }
 
@@ -58,14 +58,5 @@ export class MockEmailDiscoveryProvider implements EmailDiscoveryProvider {
         if (fails(0.2)) return null;
 
         return `${slugify(personId).replace(/^mock-/, '')}@example.com`;
-    }
-}
-
-export class MockEmailSendProvider implements EmailSendProvider {
-    async send(to: string, _email: RenderedEmail): Promise<{ messageId: string }> {
-        await delay(200, 700);
-        if (fails(0.15)) throw new Error(`mock: failed to send email to ${to}`);
-
-        return { messageId: `mock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` };
     }
 }
