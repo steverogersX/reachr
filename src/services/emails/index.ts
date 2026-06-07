@@ -1,7 +1,8 @@
 import { config } from '@/config';
-import { MockEmailDiscoveryProvider, MockEmailSendProvider } from '../mocks';
+import { MockEmailDiscoveryProvider } from '../mocks';
 import { ProspeoEmailProvider } from './providers/ProspeoEmailProvider';
 import { ResendEmailProvider } from './providers/ResendEmailProvider';
+import { SmtpEmailProvider } from './providers/SmtpEmailProvider';
 import type { EmailDiscoveryProvider, EmailSendProvider } from './types';
 
 export { ProspeoEmailProvider } from './providers/ProspeoEmailProvider';
@@ -13,9 +14,9 @@ export type { EmailTemplateName, RenderedEmail } from './templates/render';
 export type { EmailTemplateProps } from './templates/types';
 
 export function createEmailDiscoveryProvider(): EmailDiscoveryProvider {
-    return config.mock ? new MockEmailDiscoveryProvider() : new ProspeoEmailProvider();
+    return config.mock.emails ? new MockEmailDiscoveryProvider() : new ProspeoEmailProvider();
 }
 
 export function createEmailSendProvider(): EmailSendProvider {
-    return config.mock ? new MockEmailSendProvider() : new ResendEmailProvider();
+    return config.mock.send ? new SmtpEmailProvider() : new ResendEmailProvider();
 }

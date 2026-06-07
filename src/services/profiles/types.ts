@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RetryInfo } from '@/utils/http';
 
 export const LinkedinProfileSchema = z.object({
     personId:   z.string(),
@@ -10,5 +11,5 @@ export const LinkedinProfileSchema = z.object({
 export type LinkedinProfile = z.infer<typeof LinkedinProfileSchema>;
 
 export interface LinkedinDiscoveryProvider {
-    discoverLinkedinProfiles(domain: string, maxResultsPerDomain?: number): Promise<LinkedinProfile[]>;
+    discoverLinkedinProfiles(domain: string, maxResultsPerDomain?: number, onRetry?: (info: RetryInfo) => void): Promise<LinkedinProfile[]>;
 }
