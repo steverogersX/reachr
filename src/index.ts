@@ -38,11 +38,27 @@ program
         }
     });
 
+program
+    .command('preview-email <template> <to>')
+    .description('render an email template and send it to a local MailDev inbox (dev only)')
+    .action(async (template: string, to: string) => {
+        try {
+            const { previewEmailCommand } = await import('./commands/previewEmail.js');
+            await previewEmailCommand(template, to);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            process.stderr.write(`\n  ${msg}\n\n`);
+            process.exit(1);
+        }
+    });
+
 program.addHelpText('after', `
 Examples:
   $ reachr run stripe.com
   $ reachr run stripe.com --max-domains 8 --max-profiles 5
   $ reachr export
+  $ docker compose up -d            # start MailDev for local email testing
+  $ reachr preview-email coldOutreach you@example.com
 `);
 
 program.parse();
