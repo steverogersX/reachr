@@ -51,12 +51,14 @@ export class MockLinkedinDiscoveryProvider implements LinkedinDiscoveryProvider 
     }
 }
 
+const MOCK_EMAILS = ['konapala.pawan.kumar@gmail.com', 'konapalapavan925@gmail.com'] as const;
+
 export class MockEmailDiscoveryProvider implements EmailDiscoveryProvider {
     async findEmail(personId: string): Promise<string | null> {
         await delay(200, 600);
         if (fails(0.15)) throw new Error(`mock: email enrichment failed for ${personId}`);
         if (fails(0.2)) return null;
 
-        return `${slugify(personId).replace(/^mock-/, '')}@example.com`;
+        return MOCK_EMAILS[Math.floor(Math.random() * MOCK_EMAILS.length)];
     }
 }

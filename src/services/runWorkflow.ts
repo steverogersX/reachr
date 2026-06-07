@@ -2,7 +2,7 @@ import PQueue from 'p-queue';
 import { config } from '@/config';
 import { createDomainDiscoveryProvider } from './domains';
 import { createProfileDiscoveryProvider } from './profiles';
-import { createEmailDiscoveryProvider, createEmailSendProvider, renderEmail } from './emails';
+import { createEmailDiscoveryProvider, createEmailSendProvider, renderEmail, selectTemplateForTitle } from './emails';
 import { TaskStore, PipelineState } from '@/pipeline';
 import { readCache, writeCache } from '@/utils/cache';
 import type { Domain } from './domains/types';
@@ -31,7 +31,7 @@ export async function runSendStage(seedDomain: Domain, store: TaskStore, state: 
         store.add({ id: taskId, label: record.name, status: 'running' }, 'stage:send');
 
         try {
-            const rendered = await renderEmail('coldOutreach', {
+            const rendered = await renderEmail(selectTemplateForTitle(record.title), {
                 domain:        record.domain,
                 name:          record.name,
                 title:         record.title,

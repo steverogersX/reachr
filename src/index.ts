@@ -53,6 +53,20 @@ program
     });
 
 program
+    .command('report <domain>')
+    .description('show a per-stage success/failure summary for the latest run')
+    .action(async (domain: string) => {
+        try {
+            const { reportCommand } = await import('./commands/report.js');
+            await reportCommand(domain);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            process.stderr.write(`\n  ${msg}\n\n`);
+            process.exit(1);
+        }
+    });
+
+program
     .command('preview-email <template> <to>')
     .description('render an email template and send it to a local MailDev inbox (dev only)')
     .action(async (template: string, to: string) => {
@@ -73,6 +87,7 @@ Examples:
   $ reachr export
   $ reachr clear-cache               # clear all cached results
   $ reachr clear-cache stripe.com    # clear cache for a single domain
+  $ reachr report stripe.com         # show per-stage results from the latest run
   $ docker compose up -d            # start MailDev for local email testing
   $ reachr preview-email coldOutreach you@example.com
 `);
