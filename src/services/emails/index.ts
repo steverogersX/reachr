@@ -12,6 +12,7 @@ export type { EmailDiscoveryProvider, EmailSendProvider } from './types';
 export { emailTemplates, renderEmail } from './templates/render';
 export type { EmailTemplateName, RenderedEmail } from './templates/render';
 export type { EmailTemplateProps } from './templates/types';
+export { selectTemplateForTitle } from './templates/persona';
 
 export function createEmailDiscoveryProvider(): EmailDiscoveryProvider {
     return config.mock.emails ? new MockEmailDiscoveryProvider() : new ProspeoEmailProvider();

@@ -1,6 +1,10 @@
 import { render } from '@react-email/render';
 import { ColdOutreachEmail } from './ColdOutreachEmail';
 import { FollowUpEmail } from './FollowUpEmail';
+import { ExecutiveOutreachEmail } from './ExecutiveOutreachEmail';
+import { SalesLeaderOutreachEmail } from './SalesLeaderOutreachEmail';
+import { OperationsOutreachEmail } from './OperationsOutreachEmail';
+import { HrOutreachEmail } from './HrOutreachEmail';
 import type { EmailTemplateProps } from './types';
 
 export interface RenderedEmail {
@@ -16,6 +20,10 @@ type EmailTemplate = ((props: EmailTemplateProps) => React.ReactElement) & {
 export const emailTemplates = {
     coldOutreach: ColdOutreachEmail,
     followUp: FollowUpEmail,
+    executiveOutreach: ExecutiveOutreachEmail,
+    salesLeaderOutreach: SalesLeaderOutreachEmail,
+    operationsOutreach: OperationsOutreachEmail,
+    hrOutreach: HrOutreachEmail,
 } satisfies Record<string, EmailTemplate>;
 
 export type EmailTemplateName = keyof typeof emailTemplates;

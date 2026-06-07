@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text, Static, useApp } from 'ink';
 import { ConfirmInput } from '@inkjs/ui';
 import { Thread } from '@/ui/thread';
 import { glyph, color } from '@/ui/theme';
 import { runWorkflow, runSendStage, type WorkflowOptions } from '@/services/runWorkflow';
 import { TaskStore, PipelineState, type Task, type TaskStatus } from '@/pipeline';
+import { buildRunReport, writeRunReport } from '@/utils/runReport';
 import type { Domain } from '@/services/domains/types';
 import type { Status } from '@/ui/thread/types';
 import { ResultsTable } from '@/ui/ResultsTable';
@@ -142,6 +143,12 @@ interface RunViewProps {
 
 type Phase = 'discovering' | 'confirm-send' | 'sending' | 'cancelled' | 'done';
 
+// Ink's renderer keeps a single staticNode per root — mounting more than one
+// <Static> means the later one silently overwrites the earlier one, so the
+// header and stages must share one <Static> with a tagged-union item list.
+const HEADER = { kind: 'header' as const };
+type StaticItem = typeof HEADER | { kind: 'stage'; task: Task };
+
 function SendPrompt({ count, onConfirm, onCancel }: { count: number; onConfirm: () => void; onCancel: () => void }) {
     return (
         <Box flexDirection="column" marginTop={1}>
@@ -194,6 +201,13 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
     const sendable = state.profiles.filter(p => p.email && !p.sentAt).length;
     const wantsSend = sendable > 0;
 
+    // persists a per-stage success/failure summary so `reachr report <domain>`
+    // can show what happened on the latest run without re-running anything
+    const persistReport = () => {
+        const report = buildRunReport(domain, store.getTasks());
+        void writeRunReport(domain, report);
+    };
+
     useEffect(() => {
         // Ink repaints its whole live tree on every render. Pushing finished
         // stages into <Static> writes them to the terminal exactly once —
@@ -226,12 +240,14 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
                 if (state.profiles.some(p => p.email && !p.sentAt)) {
                     setPhase('confirm-send');
                 } else {
+                    persistReport();
                     setPhase('done');
                     setTimeout(() => exit(), 500);
                 }
             })
             .catch(err => {
                 const error = err instanceof Error ? err : new Error(String(err));
+                persistReport();
                 setFatalError(error);
                 setTimeout(() => exit(error), 1500);
             });
@@ -243,17 +259,20 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
         setPhase('sending');
         runSendStage(domain, store, state)
             .then(() => {
+                persistReport();
                 setPhase('done');
                 setTimeout(() => exit(), 500);
             })
             .catch(err => {
                 const error = err instanceof Error ? err : new Error(String(err));
+                persistReport();
                 setFatalError(error);
                 setTimeout(() => exit(error), 1500);
             });
     };
 
     const handleCancel = () => {
+        persistReport();
         setPhase('cancelled');
         setTimeout(() => exit(), 500);
     };
@@ -261,11 +280,18 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
     const sendTask = staticTasks.find(t => t.id === 'stage:send') ?? liveTasks.find(t => t.id === 'stage:send');
     const isSend   = (task: Task) => task.id === 'stage:send';
 
+    const staticItems = useMemo<StaticItem[]>(
+        () => [HEADER, ...staticTasks.filter(task => !isSend(task)).map(task => ({ kind: 'stage' as const, task }))],
+        [staticTasks],
+    );
+
     return (
         <Box flexDirection="column" paddingX={1} paddingTop={1}>
-            <Header domain={domain} />
-            <Static items={staticTasks.filter(task => !isSend(task))}>
-                {task => <Stage key={task.id} task={task} />}
+            <Static items={staticItems}>
+                {item => item.kind === 'header'
+                    ? <Header key="header" domain={domain} />
+                    : <Stage key={item.task.id} task={item.task} />
+                }
             </Static>
             {fatalError
                 ? <FatalError error={fatalError} />
@@ -275,7 +301,11 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
             {phase === 'confirm-send' && wantsSend && (
                 <SendPrompt count={sendable} onConfirm={handleConfirm} onCancel={handleCancel} />
             )}
-            {sendTask && <Stage task={sendTask} />}
+            {sendTask && (
+                <Box marginTop={1}>
+                    <Stage task={sendTask} />
+                </Box>
+            )}
             {phase === 'cancelled' && <CancelledNotice />}
             {phase === 'done' && sendTask && (
                 <DoneSummary
