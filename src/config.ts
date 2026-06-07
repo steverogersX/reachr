@@ -25,6 +25,12 @@ const ConfigSchema = z.object({
     cache: z.object({
         ttlHours: z.coerce.number().int().min(0).default(24),
     }),
+
+    smtp: z.object({
+        host: z.string().min(1).default('localhost'),
+        port: z.coerce.number().int().min(1).default(1025),
+        from: z.string().min(1).default('reachr@example.com'),
+    }),
 });
 
 function load() {
@@ -45,6 +51,11 @@ function load() {
         },
         cache: {
             ttlHours: process.env.CACHE_TTL_HOURS,
+        },
+        smtp: {
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+            from: process.env.SMTP_FROM,
         },
     });
 
