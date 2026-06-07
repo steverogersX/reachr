@@ -1,8 +1,8 @@
 import PQueue from 'p-queue';
 import { config } from '@/config';
-import { CompanyEnrichProvider } from './domains';
-import { ProspeoProfileDiscoveryProvider } from './profiles/providers/ProspeoProvider';
-import { ProspeoEmailProvider, createEmailSendProvider, renderEmail } from './emails';
+import { createDomainDiscoveryProvider } from './domains';
+import { createProfileDiscoveryProvider } from './profiles';
+import { createEmailDiscoveryProvider, createEmailSendProvider, renderEmail } from './emails';
 import { TaskStore, PipelineState } from '@/pipeline';
 import { readCache, writeCache } from '@/utils/cache';
 import type { Domain } from './domains/types';
@@ -10,10 +10,9 @@ import type { Domain } from './domains/types';
 export interface WorkflowOptions {
     maxDomains:  number;
     maxProfiles: number;
-    send:        boolean;
 }
 
-const DEFAULTS: WorkflowOptions = { maxDomains: 4, maxProfiles: 3, send: false };
+const DEFAULTS: WorkflowOptions = { maxDomains: 4, maxProfiles: 3 };
 
 export async function runSendStage(seedDomain: Domain, store: TaskStore, state: PipelineState): Promise<void> {
     const sendProvider = createEmailSendProvider();
@@ -71,8 +70,8 @@ export async function runWorkflow(
     const MAX_DOMAINS  = opts.maxDomains  ?? DEFAULTS.maxDomains;
     const MAX_PROFILES = opts.maxProfiles ?? DEFAULTS.maxProfiles;
 
-    const domainProvider  = new CompanyEnrichProvider();
-    const profileProvider = new ProspeoProfileDiscoveryProvider();
+    const domainProvider  = createDomainDiscoveryProvider();
+    const profileProvider = createProfileDiscoveryProvider();
 
     store.add({ id: 'stage:domains', label: 'Discovering Domains', status: 'running' });
 
@@ -128,7 +127,7 @@ export async function runWorkflow(
 
     store.update('stage:profiles', { status: 'done' });
 
-    const emailProvider = new ProspeoEmailProvider();
+    const emailProvider = createEmailDiscoveryProvider();
     store.add({ id: 'stage:emails', label: 'Enriching Emails', status: 'running' });
 
     for (const record of state.profiles) {

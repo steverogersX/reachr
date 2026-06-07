@@ -10,14 +10,12 @@ program
     .description('discover lookalike domains and LinkedIn profiles')
     .option('--max-domains <n>', 'max lookalike domains to process', '4')
     .option('--max-profiles <n>', 'max profiles to fetch per domain', '3')
-    .option('--send', 'send outreach emails to enriched profiles (Resend in production, MailDev when MOCK=true)', false)
-    .action(async (domain: string, opts: { maxDomains: string; maxProfiles: string; send: boolean }) => {
+    .action(async (domain: string, opts: { maxDomains: string; maxProfiles: string }) => {
         try {
             const { runCommand } = await import('./commands/run.js');
             await runCommand(domain, {
                 maxDomains:  parseInt(opts.maxDomains,  10),
                 maxProfiles: parseInt(opts.maxProfiles, 10),
-                send:        opts.send,
             });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -33,6 +31,20 @@ program
         try {
             const { exportCommand } = await import('./commands/export.js');
             await exportCommand();
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            process.stderr.write(`\n  ${msg}\n\n`);
+            process.exit(1);
+        }
+    });
+
+program
+    .command('clear-cache [domain]')
+    .description('clear cached results (all domains, or a single domain)')
+    .action(async (domain?: string) => {
+        try {
+            const { clearCacheCommand } = await import('./commands/clearCache.js');
+            await clearCacheCommand(domain);
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             process.stderr.write(`\n  ${msg}\n\n`);
@@ -58,8 +70,9 @@ program.addHelpText('after', `
 Examples:
   $ reachr run stripe.com
   $ reachr run stripe.com --max-domains 8 --max-profiles 5
-  $ reachr run stripe.com --send             # also send outreach emails to enriched profiles
   $ reachr export
+  $ reachr clear-cache               # clear all cached results
+  $ reachr clear-cache stripe.com    # clear cache for a single domain
   $ docker compose up -d            # start MailDev for local email testing
   $ reachr preview-email coldOutreach you@example.com
 `);

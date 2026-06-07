@@ -144,15 +144,33 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
     const [phase, setPhase]           = useState<Phase>('discovering');
 
     const sendable = state.profiles.filter(p => p.email && !p.sentAt).length;
-    const wantsSend = (opts.send ?? false) && sendable > 0;
+    const wantsSend = sendable > 0;
 
     useEffect(() => {
-        const onChange = (t: Task[]) => setTasks([...t]);
+        // Ink repaints the whole region on every render; the store can emit
+        // 'change' dozens of times per second (per profile/email/send), and
+        // each repaint floods the terminal scrollback and snaps it to the
+        // bottom. Throttling re-renders keeps the UI responsive to scrolling.
+        let pending: Task[] | null = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        const flush = () => {
+            timer = null;
+            if (pending) {
+                setTasks(pending);
+                pending = null;
+            }
+        };
+
+        const onChange = (t: Task[]) => {
+            pending = [...t];
+            if (!timer) timer = setTimeout(flush, 100);
+        };
         store.on('change', onChange);
 
         runWorkflow(domain, store, state, opts)
             .then(() => {
-                if ((opts.send ?? false) && state.profiles.some(p => p.email && !p.sentAt)) {
+                if (state.profiles.some(p => p.email && !p.sentAt)) {
                     setPhase('confirm-send');
                 } else {
                     setPhase('done');
@@ -165,7 +183,10 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
                 setTimeout(() => exit(error), 1500);
             });
 
-        return () => { store.off('change', onChange); };
+        return () => {
+            store.off('change', onChange);
+            if (timer) clearTimeout(timer);
+        };
     }, []);
 
     const handleConfirm = () => {
@@ -187,17 +208,21 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
         setTimeout(() => exit(), 500);
     };
 
+    const sendTask    = tasks.find(task => task.id === 'stage:send');
+    const otherTasks  = tasks.filter(task => task.id !== 'stage:send');
+
     return (
         <Box flexDirection="column" paddingX={1} paddingTop={1}>
             <Header domain={domain} />
             {fatalError
                 ? <FatalError error={fatalError} />
-                : tasks.map(task => <Stage key={task.id} task={task} />)
+                : otherTasks.map(task => <Stage key={task.id} task={task} />)
             }
             {phase !== 'discovering' && <ResultsTable profiles={state.profiles} />}
             {phase === 'confirm-send' && wantsSend && (
                 <SendPrompt count={sendable} onConfirm={handleConfirm} onCancel={handleCancel} />
             )}
+            {sendTask && <Stage task={sendTask} />}
             {phase === 'cancelled' && <CancelledNotice />}
         </Box>
     );
