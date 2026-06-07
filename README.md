@@ -12,6 +12,14 @@ One input, four stages, zero manual steps in between. You get a live terminal
 view of the whole run, a safety prompt before any email actually goes out, and
 a report afterwards showing what worked and what didn't.
 
+## Demo
+
+Watch it run end to end: https://www.loom.com/share/abd03fb5521b4d888423add06bc4dfa4
+
+<div style="position: relative; padding-bottom: 74.9221183800623%; height: 0;">
+  <iframe src="https://www.loom.com/embed/abd03fb5521b4d888423add06bc4dfa4" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+</div>
+
 ```
 $ reachr run stripe.com
 
