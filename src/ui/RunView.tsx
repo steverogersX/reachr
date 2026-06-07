@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useApp } from 'ink';
+import { ConfirmInput } from '@inkjs/ui';
 import { Thread } from '@/ui/thread';
 import { icons } from '@/ui/icons';
-import { runWorkflow, type WorkflowOptions } from '@/services/runWorkflow';
+import { runWorkflow, runSendStage, type WorkflowOptions } from '@/services/runWorkflow';
 import { TaskStore, PipelineState, type Task, type TaskStatus } from '@/pipeline';
 import type { Domain } from '@/services/domains/types';
 import type { Status } from '@/ui/thread/types';
@@ -114,11 +115,36 @@ interface RunViewProps {
     opts:   Partial<WorkflowOptions>;
 }
 
+type Phase = 'discovering' | 'confirm-send' | 'sending' | 'cancelled' | 'done';
+
+function SendPrompt({ count, onConfirm, onCancel }: { count: number; onConfirm: () => void; onCancel: () => void }) {
+    return (
+        <Box flexDirection="column" marginTop={1} gap={1}>
+            <Text>
+                Send outreach emails to <Text bold>{count}</Text> {count === 1 ? 'profile' : 'profiles'}? <Text dimColor>(Y/n)</Text>
+            </Text>
+            <ConfirmInput onConfirm={onConfirm} onCancel={onCancel} />
+        </Box>
+    );
+}
+
+function CancelledNotice() {
+    return (
+        <Box marginTop={1} gap={1}>
+            <Text color="yellow">{icons.dot}</Text>
+            <Text dimColor>Cancelled — no emails were sent.</Text>
+        </Box>
+    );
+}
+
 export function RunView({ domain, store, state, opts }: RunViewProps) {
     const { exit } = useApp();
     const [tasks, setTasks]           = useState<Task[]>([]);
     const [fatalError, setFatalError] = useState<Error | null>(null);
-    const [complete, setComplete]     = useState(false);
+    const [phase, setPhase]           = useState<Phase>('discovering');
+
+    const sendable = state.profiles.filter(p => p.email && !p.sentAt).length;
+    const wantsSend = (opts.send ?? false) && sendable > 0;
 
     useEffect(() => {
         const onChange = (t: Task[]) => setTasks([...t]);
@@ -126,8 +152,12 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
 
         runWorkflow(domain, store, state, opts)
             .then(() => {
-                setComplete(true);
-                setTimeout(() => exit(), 500);
+                if ((opts.send ?? false) && state.profiles.some(p => p.email && !p.sentAt)) {
+                    setPhase('confirm-send');
+                } else {
+                    setPhase('done');
+                    setTimeout(() => exit(), 500);
+                }
             })
             .catch(err => {
                 const error = err instanceof Error ? err : new Error(String(err));
@@ -138,6 +168,25 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
         return () => { store.off('change', onChange); };
     }, []);
 
+    const handleConfirm = () => {
+        setPhase('sending');
+        runSendStage(domain, store, state)
+            .then(() => {
+                setPhase('done');
+                setTimeout(() => exit(), 500);
+            })
+            .catch(err => {
+                const error = err instanceof Error ? err : new Error(String(err));
+                setFatalError(error);
+                setTimeout(() => exit(error), 1500);
+            });
+    };
+
+    const handleCancel = () => {
+        setPhase('cancelled');
+        setTimeout(() => exit(), 500);
+    };
+
     return (
         <Box flexDirection="column" paddingX={1} paddingTop={1}>
             <Header domain={domain} />
@@ -145,7 +194,11 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
                 ? <FatalError error={fatalError} />
                 : tasks.map(task => <Stage key={task.id} task={task} />)
             }
-            {complete && <ResultsTable profiles={state.profiles} />}
+            {phase !== 'discovering' && <ResultsTable profiles={state.profiles} />}
+            {phase === 'confirm-send' && wantsSend && (
+                <SendPrompt count={sendable} onConfirm={handleConfirm} onCancel={handleCancel} />
+            )}
+            {phase === 'cancelled' && <CancelledNotice />}
         </Box>
     );
 }
