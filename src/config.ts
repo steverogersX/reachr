@@ -31,6 +31,20 @@ const ConfigSchema = z.object({
         port: z.coerce.number().int().min(1).default(1025),
         from: z.string().min(1).default('reachr@example.com'),
     }),
+
+    outreach: z.object({
+        senderName: z.string().min(1).default('Reachr'),
+        senderCompany: z.string().min(1).default('Reachr'),
+    }),
+
+    resend: z.object({
+        apiKey: z.string().default(''),
+        baseUrl: z.string().url('RESEND_BASE_URL must be a valid URL').default('https://api.resend.com'),
+        from: z.string().default(''),
+        maxAttempts: z.coerce.number().int().min(1).default(3),
+        backoffMs: z.coerce.number().int().min(0).default(1000),
+        rateLimit: z.coerce.number().int().min(1).default(2),
+    }),
 });
 
 function load() {
@@ -56,6 +70,18 @@ function load() {
             host: process.env.SMTP_HOST,
             port: process.env.SMTP_PORT,
             from: process.env.SMTP_FROM,
+        },
+        outreach: {
+            senderName: process.env.SENDER_NAME,
+            senderCompany: process.env.SENDER_COMPANY,
+        },
+        resend: {
+            apiKey: process.env.RESEND_API_KEY,
+            baseUrl: process.env.RESEND_BASE_URL,
+            from: process.env.RESEND_FROM,
+            maxAttempts: process.env.RESEND_MAX_ATTEMPTS,
+            backoffMs: process.env.RESEND_BACKOFF_MS,
+            rateLimit: process.env.RESEND_RATE_LIMIT,
         },
     });
 
