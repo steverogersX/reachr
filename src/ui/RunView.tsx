@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useApp } from 'ink';
+import { ConfirmInput } from '@inkjs/ui';
 import { Thread } from '@/ui/thread';
 import { icons } from '@/ui/icons';
-import { runWorkflow, type WorkflowOptions } from '@/services/runWorkflow';
+import { runWorkflow, runSendStage, type WorkflowOptions } from '@/services/runWorkflow';
 import { TaskStore, PipelineState, type Task, type TaskStatus } from '@/pipeline';
 import type { Domain } from '@/services/domains/types';
 import type { Status } from '@/ui/thread/types';
@@ -114,20 +115,67 @@ interface RunViewProps {
     opts:   Partial<WorkflowOptions>;
 }
 
+type Phase = 'discovering' | 'confirm-send' | 'sending' | 'cancelled' | 'done';
+
+function SendPrompt({ count, onConfirm, onCancel }: { count: number; onConfirm: () => void; onCancel: () => void }) {
+    return (
+        <Box flexDirection="column" marginTop={1} gap={1}>
+            <Text>
+                Send outreach emails to <Text bold>{count}</Text> {count === 1 ? 'profile' : 'profiles'}? <Text dimColor>(Y/n)</Text>
+            </Text>
+            <ConfirmInput onConfirm={onConfirm} onCancel={onCancel} />
+        </Box>
+    );
+}
+
+function CancelledNotice() {
+    return (
+        <Box marginTop={1} gap={1}>
+            <Text color="yellow">{icons.dot}</Text>
+            <Text dimColor>Cancelled — no emails were sent.</Text>
+        </Box>
+    );
+}
+
 export function RunView({ domain, store, state, opts }: RunViewProps) {
     const { exit } = useApp();
     const [tasks, setTasks]           = useState<Task[]>([]);
     const [fatalError, setFatalError] = useState<Error | null>(null);
-    const [complete, setComplete]     = useState(false);
+    const [phase, setPhase]           = useState<Phase>('discovering');
+
+    const sendable = state.profiles.filter(p => p.email && !p.sentAt).length;
+    const wantsSend = sendable > 0;
 
     useEffect(() => {
-        const onChange = (t: Task[]) => setTasks([...t]);
+        // Ink repaints the whole region on every render; the store can emit
+        // 'change' dozens of times per second (per profile/email/send), and
+        // each repaint floods the terminal scrollback and snaps it to the
+        // bottom. Throttling re-renders keeps the UI responsive to scrolling.
+        let pending: Task[] | null = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        const flush = () => {
+            timer = null;
+            if (pending) {
+                setTasks(pending);
+                pending = null;
+            }
+        };
+
+        const onChange = (t: Task[]) => {
+            pending = [...t];
+            if (!timer) timer = setTimeout(flush, 100);
+        };
         store.on('change', onChange);
 
         runWorkflow(domain, store, state, opts)
             .then(() => {
-                setComplete(true);
-                setTimeout(() => exit(), 500);
+                if (state.profiles.some(p => p.email && !p.sentAt)) {
+                    setPhase('confirm-send');
+                } else {
+                    setPhase('done');
+                    setTimeout(() => exit(), 500);
+                }
             })
             .catch(err => {
                 const error = err instanceof Error ? err : new Error(String(err));
@@ -135,17 +183,47 @@ export function RunView({ domain, store, state, opts }: RunViewProps) {
                 setTimeout(() => exit(error), 1500);
             });
 
-        return () => { store.off('change', onChange); };
+        return () => {
+            store.off('change', onChange);
+            if (timer) clearTimeout(timer);
+        };
     }, []);
+
+    const handleConfirm = () => {
+        setPhase('sending');
+        runSendStage(domain, store, state)
+            .then(() => {
+                setPhase('done');
+                setTimeout(() => exit(), 500);
+            })
+            .catch(err => {
+                const error = err instanceof Error ? err : new Error(String(err));
+                setFatalError(error);
+                setTimeout(() => exit(error), 1500);
+            });
+    };
+
+    const handleCancel = () => {
+        setPhase('cancelled');
+        setTimeout(() => exit(), 500);
+    };
+
+    const sendTask    = tasks.find(task => task.id === 'stage:send');
+    const otherTasks  = tasks.filter(task => task.id !== 'stage:send');
 
     return (
         <Box flexDirection="column" paddingX={1} paddingTop={1}>
             <Header domain={domain} />
             {fatalError
                 ? <FatalError error={fatalError} />
-                : tasks.map(task => <Stage key={task.id} task={task} />)
+                : otherTasks.map(task => <Stage key={task.id} task={task} />)
             }
-            {complete && <ResultsTable profiles={state.profiles} />}
+            {phase !== 'discovering' && <ResultsTable profiles={state.profiles} />}
+            {phase === 'confirm-send' && wantsSend && (
+                <SendPrompt count={sendable} onConfirm={handleConfirm} onCancel={handleCancel} />
+            )}
+            {sendTask && <Stage task={sendTask} />}
+            {phase === 'cancelled' && <CancelledNotice />}
         </Box>
     );
 }

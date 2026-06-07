@@ -20,7 +20,7 @@ export class CompanyEnrichProvider implements DomainDiscoveryProvider {
         const data = await withRetry(
             `${this.cfg.baseUrl}/companies/similar`,
             this.cfg.apiKey,
-            { domain, maxResults },
+            { domain, limit: maxResults },
             undefined,
             {
                 maxRetries: this.cfg.maxAttempts - 1,

@@ -28,17 +28,16 @@ export class ProspeoProfileDiscoveryProvider implements LinkedinDiscoveryProvide
     private readonly cfg = config.prospeo;
 
     async discoverLinkedinProfiles(domain: string, maxResults = 10): Promise<LinkedinProfile[]> {
-        const limit = Math.min(maxResults, 10);
         const data = await withRetry(
             `${this.cfg.baseUrl}/search-person`,
             this.cfg.apiKey,
             {
                 page: 1,
-                limit,
                 filters: {
                     company: {
                         websites: { include: [domain] },
                     },
+                    max_person_per_company: Math.min(maxResults, 100),
                 },
             },
             undefined,

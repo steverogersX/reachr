@@ -18,6 +18,8 @@ const CacheEntrySchema = z.object({
         title:       z.string(),
         linkedinUrl: z.string(),
         email:       z.string().optional(),
+        sentAt:      z.string().optional(),
+        messageId:   z.string().optional(),
     })),
 });
 
@@ -45,6 +47,25 @@ export async function writeCache(domain: string, profiles: ProfileRecord[]): Pro
     await fs.mkdir(CACHE_DIR, { recursive: true });
     const entry = { version: VERSION, domain, cachedAt: new Date().toISOString(), profiles };
     await fs.writeFile(cacheFile(domain), JSON.stringify(entry, null, 2), 'utf8');
+}
+
+export async function clearCache(domain?: string): Promise<number> {
+    if (domain) {
+        try {
+            await fs.unlink(cacheFile(domain));
+            return 1;
+        } catch {
+            return 0;
+        }
+    }
+
+    try {
+        const files = (await fs.readdir(CACHE_DIR)).filter(f => f.endsWith('.json'));
+        await Promise.all(files.map(f => fs.unlink(path.join(CACHE_DIR, f))));
+        return files.length;
+    } catch {
+        return 0;
+    }
 }
 
 export async function readAllCaches(): Promise<ProfileRecord[]> {

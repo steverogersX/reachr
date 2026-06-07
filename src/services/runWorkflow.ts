@@ -1,6 +1,8 @@
-import { CompanyEnrichProvider } from './domains';
-import { ProspeoProfileDiscoveryProvider } from './profiles/providers/ProspeoProvider';
-import { ProspeoEmailProvider } from './emails';
+import PQueue from 'p-queue';
+import { config } from '@/config';
+import { createDomainDiscoveryProvider } from './domains';
+import { createProfileDiscoveryProvider } from './profiles';
+import { createEmailDiscoveryProvider, createEmailSendProvider, renderEmail } from './emails';
 import { TaskStore, PipelineState } from '@/pipeline';
 import { readCache, writeCache } from '@/utils/cache';
 import type { Domain } from './domains/types';
@@ -11,6 +13,44 @@ export interface WorkflowOptions {
 }
 
 const DEFAULTS: WorkflowOptions = { maxDomains: 4, maxProfiles: 3 };
+
+export async function runSendStage(seedDomain: Domain, store: TaskStore, state: PipelineState): Promise<void> {
+    const sendProvider = createEmailSendProvider();
+    const queue = new PQueue({
+        concurrency: 4,
+        interval: 1000,
+        intervalCap: config.resend.rateLimit,
+    });
+
+    store.add({ id: 'stage:send', label: 'Sending Emails', status: 'running' });
+
+    const recipients = state.profiles.filter(record => record.email && !record.sentAt);
+
+    await Promise.all(recipients.map(record => queue.add(async () => {
+        const taskId = `send:${record.linkedinUrl}`;
+        store.add({ id: taskId, label: record.name, status: 'running' }, 'stage:send');
+
+        try {
+            const rendered = await renderEmail('coldOutreach', {
+                domain:        record.domain,
+                name:          record.name,
+                title:         record.title,
+                linkedinUrl:   record.linkedinUrl,
+                senderName:    config.outreach.senderName,
+                senderCompany: config.outreach.senderCompany,
+            });
+            const { messageId } = await sendProvider.send(record.email!, rendered);
+            state.markSent(record.linkedinUrl, messageId);
+            store.update(taskId, { status: 'done', right: record.email });
+        } catch (err) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            store.update(taskId, { status: 'error', error });
+        }
+    })));
+
+    store.update('stage:send', { status: 'done' });
+    await writeCache(seedDomain, state.profiles);
+}
 
 export async function runWorkflow(
     seedDomain: Domain,
@@ -30,8 +70,8 @@ export async function runWorkflow(
     const MAX_DOMAINS  = opts.maxDomains  ?? DEFAULTS.maxDomains;
     const MAX_PROFILES = opts.maxProfiles ?? DEFAULTS.maxProfiles;
 
-    const domainProvider  = new CompanyEnrichProvider();
-    const profileProvider = new ProspeoProfileDiscoveryProvider();
+    const domainProvider  = createDomainDiscoveryProvider();
+    const profileProvider = createProfileDiscoveryProvider();
 
     store.add({ id: 'stage:domains', label: 'Discovering Domains', status: 'running' });
 
@@ -87,7 +127,7 @@ export async function runWorkflow(
 
     store.update('stage:profiles', { status: 'done' });
 
-    const emailProvider = new ProspeoEmailProvider();
+    const emailProvider = createEmailDiscoveryProvider();
     store.add({ id: 'stage:emails', label: 'Enriching Emails', status: 'running' });
 
     for (const record of state.profiles) {
@@ -115,5 +155,6 @@ export async function runWorkflow(
     }
 
     store.update('stage:emails', { status: 'done' });
+
     await writeCache(seedDomain, state.profiles);
 }

@@ -39,6 +39,20 @@ program
     });
 
 program
+    .command('clear-cache [domain]')
+    .description('clear cached results (all domains, or a single domain)')
+    .action(async (domain?: string) => {
+        try {
+            const { clearCacheCommand } = await import('./commands/clearCache.js');
+            await clearCacheCommand(domain);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            process.stderr.write(`\n  ${msg}\n\n`);
+            process.exit(1);
+        }
+    });
+
+program
     .command('preview-email <template> <to>')
     .description('render an email template and send it to a local MailDev inbox (dev only)')
     .action(async (template: string, to: string) => {
@@ -57,6 +71,8 @@ Examples:
   $ reachr run stripe.com
   $ reachr run stripe.com --max-domains 8 --max-profiles 5
   $ reachr export
+  $ reachr clear-cache               # clear all cached results
+  $ reachr clear-cache stripe.com    # clear cache for a single domain
   $ docker compose up -d            # start MailDev for local email testing
   $ reachr preview-email coldOutreach you@example.com
 `);
