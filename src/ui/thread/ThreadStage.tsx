@@ -1,38 +1,28 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { Spinner } from "@inkjs/ui";
-import { icons } from "../icons";
-import type { Status, ThreadStageProps } from "./types";
+import { glyph, color } from "../theme";
+import type { ThreadStageProps } from "./types";
 
-const LABEL_COLOR: Record<Status, string> = {
-    idle:    "gray",
-    loading: "cyan",
-    done:    "green",
-    error:   "red",
-};
+export function ThreadStage({ label, icon, status = "idle", count }: ThreadStageProps) {
+    // the stage marker stays neutral — status is conveyed by the spinner while
+    // running and by the child items / count once settled, never by coloring the
+    // header itself (green is reserved for actual success markers)
+    const errored = status === "error";
 
-const DOT_COLOR: Record<Status, string> = {
-    idle:    "gray",
-    loading: "cyan",
-    done:    "green",
-    error:   "red",
-};
-
-export function ThreadStage({ label, icon, status = "idle" }: ThreadStageProps) {
     return (
-        <Box marginBottom={1}>
-            <Box marginRight={1}>
+        <Box>
+            <Box width={2}>
                 {status === "loading"
                     ? <Spinner />
-                    : <Text color={DOT_COLOR[status]}>{icons.stage}</Text>
-                }
+                    : <Text color={errored ? color.error : color.muted}>{glyph.stage}</Text>}
             </Box>
 
             {icon !== undefined && <Box marginRight={1}>{icon}</Box>}
 
-            <Text bold color={LABEL_COLOR[status]}>
-                {label}
-            </Text>
+            <Text bold color={errored ? color.error : color.text}>{label}</Text>
+
+            {count !== undefined && <Box marginLeft={2}>{count}</Box>}
         </Box>
     );
 }

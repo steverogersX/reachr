@@ -100,12 +100,11 @@ export async function runWorkflow(
                 for (const profile of profiles) {
                     store.add(
                         {
-                            id:     `profile:${domain}:${profile.name}`,
+                            id:     `profile:${profile.profileUrl}`,
                             label:  profile.name,
                             status: 'done',
                             data:   profile,
                             meta:   profile.title,
-                            right:  profile.profileUrl,
                         },
                         `profiles:${domain}`,
                     );

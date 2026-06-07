@@ -45,7 +45,7 @@ export class MockLinkedinDiscoveryProvider implements LinkedinDiscoveryProvider 
                 name,
                 title:      pick(TITLES),
                 headline:   `${pick(TITLES)} at ${domain}`,
-                profileUrl: `https://linkedin.com/in/${slugify(name)}-${i}`,
+                profileUrl: `https://linkedin.com/in/${slugify(domain)}-${slugify(name)}-${i}`,
             };
         });
     }

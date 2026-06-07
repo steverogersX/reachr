@@ -2,31 +2,22 @@ import React from "react";
 import { Box, Text } from "ink";
 import { Spinner } from "@inkjs/ui";
 import { ThreadContext, useThread } from "./context";
-import { icons } from "../icons";
+import { glyph, color } from "../theme";
 import type { Status, ThreadItemProps } from "./types";
-
-const LABEL_COLOR: Record<Status, string> = {
-    idle:    "white",
-    loading: "white",
-    done:    "green",
-    error:   "red",
-};
-
-const DOT_COLOR: Record<Status, string> = {
-    idle:    "gray",
-    loading: "yellow",
-    done:    "green",
-    error:   "red",
-};
 
 function StatusDot({ status }: { status: Status }) {
     if (status === "loading") return <Spinner />;
-    return <Text color={DOT_COLOR[status]}>{icons.dot}</Text>;
+    const tint = status === "done"  ? color.success
+               : status === "error" ? color.error
+               :                      color.muted;
+    return <Text color={tint}>{glyph.dot}</Text>;
 }
 
 function buildPrefix(parentLines: boolean[], isLast: boolean): string {
-    const trunk = parentLines.map(active => (active ? `${icons.pipe}  ` : icons.indent)).join("");
-    return trunk + (isLast ? `${icons.last} ` : `${icons.branch} `);
+    const trunk = parentLines
+        .map(active => (active ? `${glyph.pipe}  ` : glyph.indent))
+        .join("");
+    return trunk + (isLast ? `${glyph.last} ` : `${glyph.branch} `);
 }
 
 export function ThreadItem({
@@ -42,28 +33,34 @@ export function ThreadItem({
     const prefix = buildPrefix(parentLines, isLast);
     const childCtx = { depth: depth + 1, parentLines: [...parentLines, !isLast] };
 
+    const labelColor = status === "done"    ? color.success
+                     : status === "error"   ? color.error
+                     : status === "skipped" ? color.muted
+                     : color.text;
+
     return (
         <>
             <Box>
-                <Text dimColor>{prefix}</Text>
+                {/* faint tree connectors so the data reads first */}
+                <Text color={color.muted} dimColor>{prefix}</Text>
 
-                <Box marginRight={1}>
+                <Box width={2}>
                     <StatusDot status={status} />
                 </Box>
 
                 {icon !== undefined && <Box marginRight={1}>{icon}</Box>}
 
-                <Text bold={depth === 0} color={LABEL_COLOR[status]}>
-                    {label}
-                </Text>
+                <Text color={labelColor} wrap="truncate-end">{label}</Text>
 
                 {meta !== undefined && (
-                    <Text dimColor>
-                        {" "}{icons.sep}{" "}{meta}
-                    </Text>
+                    <Text color={color.muted} wrap="truncate-end">{"  "}{meta}</Text>
                 )}
 
-                {right !== undefined && <Box marginLeft={2}>{right}</Box>}
+                {right !== undefined && (
+                    <Box marginLeft={2}>
+                        <Text color={color.muted} wrap="truncate-end">{right}</Text>
+                    </Box>
+                )}
             </Box>
 
             {children !== undefined && (

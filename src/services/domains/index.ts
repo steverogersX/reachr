@@ -7,5 +7,5 @@ export * from './types';
 export * from './providers/CompanyEnrichProvider';
 
 export function createDomainDiscoveryProvider(): DomainDiscoveryProvider {
-    return config.mock ? new MockDomainDiscoveryProvider() : new CompanyEnrichProvider();
+    return config.mock.domains ? new MockDomainDiscoveryProvider() : new CompanyEnrichProvider();
 }

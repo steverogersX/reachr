@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type Status = 'idle' | 'loading' | 'done' | 'error';
+export type Status = 'idle' | 'loading' | 'done' | 'error' | 'skipped';
 
 export interface ThreadContextValue {
     depth: number;
@@ -21,4 +21,5 @@ export interface ThreadStageProps {
     label: string;
     icon?: ReactNode;
     status?: Status;
+    count?: ReactNode; // optional trailing summary, e.g. "4 found"
 }
